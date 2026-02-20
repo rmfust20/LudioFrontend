@@ -22,8 +22,7 @@ struct BoardGameCardView: View {
                     .scaledToFit()
                 VStack(alignment: .leading, spacing: 14) {
                     Text(boardGame.name)
-                        .font(.system(size:15))
-                        .foregroundStyle(Color("TextColor"))
+                        .font(.system(size:25))
                         .buttonStyle(.plain)
                     WantToPlayButtonView()
                     RateThisGameView(isPresented: $showStars)
@@ -33,12 +32,13 @@ struct BoardGameCardView: View {
             .padding()
             .padding(.bottom,30)
             .background(
-                RoundedRectangle(cornerRadius: 2)
+                RoundedRectangle(cornerRadius: 10)
                     .stroke(Color.gray, lineWidth: 1)
                     .opacity(0.5)
             )
+            .background(Color.white)
         }
-        .background(Color("CardSurface"))
+        .padding(.vertical, 20)
     }
 }
 

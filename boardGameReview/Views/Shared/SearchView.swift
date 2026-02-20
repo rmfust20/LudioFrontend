@@ -11,7 +11,8 @@ struct SearchView: View {
     @State private var searchText: String = ""
     var body: some View {
         ZStack {
-            Color("SearchBackground")
+            Color("WantToPlayButton")
+                .opacity(0.75)
                 .ignoresSafeArea()
             HStack {
                 Image(systemName: "magnifyingglass")

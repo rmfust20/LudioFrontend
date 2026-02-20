@@ -9,13 +9,16 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject private var router: HomeRouter
+    @EnvironmentObject private var auth: Auth
     @StateObject var homeFeedViewModel = HomeFeedViewModel()
     @ObservedObject var reviewViewModel = ReviewViewModel()
     @State private var showStars: Bool = false
     let userID = 1
     var body: some View {
+        SearchView()
+            .padding(.vertical,-10)
         ZStack {
-            Color("Background").ignoresSafeArea()
+            Color("SoftOffWhite")
             ScrollView {
                 LazyVStack {
                     ForEach(homeFeedViewModel.boardGames) { boardGame in
@@ -28,7 +31,7 @@ struct HomeView: View {
                                     await homeFeedViewModel.updateImageCache(boardGame: boardGame)
                                 }
                                 if boardGame.id == homeFeedViewModel.boardGames.last?.id {
-                                    Task { await homeFeedViewModel.fetchBoardGamesFromNetwork(userID)
+                                    Task { await homeFeedViewModel.fetchBoardGamesFromNetwork(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "")
                                     }
                                 }
                             }
@@ -37,7 +40,7 @@ struct HomeView: View {
             }
             .onAppear() {
                 Task {
-                    await homeFeedViewModel.fetchBoardGames(1)
+                    await homeFeedViewModel.fetchBoardGames(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "")
                 }
             }
             AddStars(isPresented: $showStars)

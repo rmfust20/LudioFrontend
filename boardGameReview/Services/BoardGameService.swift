@@ -7,7 +7,69 @@ struct BoardGameService {
 
     init(client: APIClient = APIClient.shared) {
         self.client = client
+        //self.baseURL = "https://tabulusapp.bravegrass-0afbc7b6.westus2.azurecontainerapps.io"
         self.baseURL = "http://127.0.0.1:8000"
+    }
+    
+    func fetchGeneralTrendingFeed(accessToken: String) async throws -> [BoardGameModel] {
+        var components = URLComponents(string: baseURL)
+        components?.path = "/boardGames/trendingFeed/"
+        guard let url = components?.url else { throw APIError.invalidURL }
+        
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+        
+        let (data, response) = try await client.getSession().data(from: url)
+        
+        
+
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
+        
+        let boardGames = try JSONDecoder().decode([BoardGameModel].self, from: data)
+        
+        return boardGames
+    }
+    
+    func fetchTrendingWithFriends(userID: Int, accessToken: String) async throws -> [BoardGameModel] {
+        var components = URLComponents(string: baseURL)
+        components?.path = "/boardGames/trendingFriends/\(userID)"
+        guard let url = components?.url else { throw APIError.invalidURL }
+        
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+        
+        let (data, response) = try await client.getSession().data(from: url)
+        
+        
+
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
+        
+        let boardGames = try JSONDecoder().decode([BoardGameModel].self, from: data)
+        
+        return boardGames
+    }
+    
+    func fetchBoardGame(boardGameID: Int, accessToken: String) async throws -> BoardGameModel {
+        var components = URLComponents(string: baseURL)
+        components?.path = "/boardGames/fetchBoardGame/\(boardGameID)"
+        guard let url = components?.url else { throw APIError.invalidURL }
+
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+        
+        let (data, response) = try await client.getSession().data(from: url)
+        
+        
+
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
+        
+        let boardGame = try JSONDecoder().decode(BoardGameModel.self, from: data)
+        
+        return boardGame
+
     }
 
     func fetchBoardGameFeedForUser(_ userID: String, _ url: inout String, _ lastSeenID: Int) async throws -> [BoardGameModel] {
@@ -33,7 +95,7 @@ struct BoardGameService {
             guard !boardGameIds.isEmpty else { return [] }
 
             var components = URLComponents(string: baseURL)
-            components?.path = "/boardGames/user/\(userID)/rehydrate"
+            components?.path = "/boardGames/userFeed/\(userID)/rehydrate"
             components?.queryItems = boardGameIds.map { URLQueryItem(name: "board_game_ids", value: String($0)) }
         
 
@@ -47,20 +109,6 @@ struct BoardGameService {
             return try JSONDecoder().decode([BoardGameModel].self, from: data)
         }
     
-    func fetchBoardGame(_ url : String) async throws -> BoardGameModel {
-        guard let url = URL(string: url) else {
-            throw APIError.invalidURL
-        }
-
-        let (data, response) = try await client.getSession().data(from:url)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw APIError.serverError(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 0,
-                                       message: "Server error")
-        }
-        
-        return try JSONDecoder().decode(BoardGameModel.self, from: data)
-
-    }
     
     func fetchBoardGameImage(_ urlString: String) async throws -> UIImage {
         guard let url = URL(string: urlString) else {

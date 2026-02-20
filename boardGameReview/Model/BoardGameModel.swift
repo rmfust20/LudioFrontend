@@ -8,7 +8,7 @@
 import Foundation
 import UIKit
 
-struct BoardGameModel: Identifiable, Codable {
+struct BoardGameModel: Identifiable, Codable, Hashable {
     let id : Int
     let name : String
     let thumbnail : String?

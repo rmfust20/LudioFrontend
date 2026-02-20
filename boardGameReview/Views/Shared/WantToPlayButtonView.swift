@@ -9,11 +9,8 @@ import SwiftUI
 
 struct WantToPlayButtonView: View {
     var body: some View {
-        Button {
-            print("heel")
-        } label: {
             HStack(spacing: 0) {
-                Text("Want to Play")
+                Text("See More")
                     .foregroundStyle(Color.white)
                     .padding(.vertical, 9)
                     .padding(.horizontal, 16)
@@ -33,8 +30,6 @@ struct WantToPlayButtonView: View {
                     .fill(Color("WantToPlayButton"))
             )
             .frame(height: 40)
-        }
-        .buttonStyle(.plain)
     }
 }
 

@@ -33,14 +33,13 @@ struct BoardGameView: View {
             }
             .onAppear() {
                 Task {
-                    await boardGameViewModel.presentBoardGame()
+                    await boardGameViewModel.presentBoardGame(accessToken: auth.accessToken ?? "")
                     await boardGameViewModel.presentImage()
+                    boardGame = boardGameViewModel.boardGame
+                    cardImage = boardGameViewModel.boardGameImage
                     await boardGameViewModel.getReviews()
                     await
                     boardGameViewModel.getUserReview(userID: auth.userID ?? 0)
-                    boardGame = boardGameViewModel.boardGame
-                    cardImage = boardGameViewModel.boardGameImage
-                    
                 }
             }
             .frame(height: 430)
