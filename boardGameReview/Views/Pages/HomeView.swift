@@ -15,8 +15,8 @@ struct HomeView: View {
     @State private var showStars: Bool = false
     let userID = 1
     var body: some View {
-        SearchView()
-            .padding(.vertical,-10)
+        //SearchView()
+            //.padding(.vertical,-10)
         ZStack {
             Color("SoftOffWhite")
             ScrollView {

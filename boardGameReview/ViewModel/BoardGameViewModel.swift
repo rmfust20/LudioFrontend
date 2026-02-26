@@ -28,8 +28,8 @@ class BoardGameViewModel: ObservableObject {
     }
     
     @MainActor
-    func fetchBoardGame(_ boardGameID : Int, accessToken: String) async -> BoardGameModel? {
-        let fetchedBoardGame = try? await boardGameService.fetchBoardGame(boardGameID: boardGameID, accessToken: accessToken)
+    func fetchBoardGame(_ boardGameID : Int) async -> BoardGameModel? {
+        let fetchedBoardGame = try? await boardGameService.fetchBoardGame(boardGameID: boardGameID)
         if let fetchedBoardGame = fetchedBoardGame {
             return fetchedBoardGame
         }
@@ -58,7 +58,7 @@ class BoardGameViewModel: ObservableObject {
     func presentBoardGame(accessToken: String) async {
         let cachedBoardGame = BoardGameCache.shared.get(id: boardGameID)
         if cachedBoardGame == nil {
-            let networkBoardGame = await fetchBoardGame(boardGameID, accessToken: accessToken)
+            let networkBoardGame = await fetchBoardGame(boardGameID)
             if let networkBoardGame = networkBoardGame {
                 BoardGameCache.shared.set(networkBoardGame)
                 self.boardGame = networkBoardGame

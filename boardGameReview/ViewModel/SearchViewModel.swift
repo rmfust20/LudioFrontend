@@ -1,27 +1,27 @@
 //
-//  GameNightViewModel.swift
+//  SearchViewModel.swift
 //  boardGameReview
 //
-//  Created by Robert Fusting on 2/9/26.
+//  Created by Robert Fusting on 2/24/26.
 //
+
 import Foundation
 
-class GameNightViewModel: ObservableObject {
-    
-    private let boardGameService: BoardGameService
+class SearchViewModel: ObservableObject {
+    @Published var searchResults: [BoardGameModel] = []
+    private var boardGameService = BoardGameService()
     
     init(boardGameService: BoardGameService = BoardGameService()) {
         self.boardGameService = boardGameService
     }
     
     @MainActor
-    func fetchBoardGame(_ boardGameID : Int) async -> BoardGameModel? {
-        let fetchedBoardGame = try? await boardGameService.fetchBoardGame(boardGameID: boardGameID)
-        if let fetchedBoardGame = fetchedBoardGame {
-            return fetchedBoardGame
-        }
-        else {
-            return nil
+    func performSearch(searchText: String) async {
+        do {
+            let result = try await boardGameService.fetchBoardGames(name: searchText)
+            searchResults = result
+        } catch {
+            print("Error fetching search results: \(error)")
         }
     }
     
@@ -36,4 +36,5 @@ class GameNightViewModel: ObservableObject {
             }
         }
     }
+    
 }

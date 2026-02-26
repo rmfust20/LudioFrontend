@@ -7,11 +7,12 @@ struct UploadImageView: View {
     var body: some View {
         VStack(spacing: 16) {
             PhotosPicker(
-                "Pick up to 5 images",
                 selection: $vm.selectedItems,
                 maxSelectionCount: 5,
                 matching: .images
-            )
+            ) {
+                AddImageView()
+            }.buttonStyle(.plain)
 
             Button(vm.isUploading ? "Uploading..." : "Upload") {
                 Task { await vm.uploadSelected() }
