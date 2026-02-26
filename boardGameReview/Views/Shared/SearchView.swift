@@ -48,7 +48,6 @@ struct SearchView: View {
                             image: ImageCache.shared.getImage(for: boardgame.id),
                             onSelect: {
                                 selectedBoardGameID = boardgame.id
-                                isPresented.toggle()
                             }
                         )
                         .padding()

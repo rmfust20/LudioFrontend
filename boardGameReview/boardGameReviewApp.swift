@@ -13,7 +13,7 @@ struct boardGameReviewApp: App {
     @StateObject var userViewModel = UserViewModel()
     var body: some Scene {
         WindowGroup {
-            ImageSelection()
+            AddGameNightView()
                 .environmentObject(auth)
                 .environmentObject(userViewModel)
         }
