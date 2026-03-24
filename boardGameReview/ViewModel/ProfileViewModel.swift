@@ -144,6 +144,7 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
+    @MainActor
     func getUserFriendsPending(userID: Int, auth: Auth) async {
         do {
             let pendingRequests = try await userService.getUserFriendsPending(userID: userID, accessToken: auth.accessToken ?? "")
@@ -151,5 +152,14 @@ class ProfileViewModel: ObservableObject {
         } catch {
             print("Error fetching pending friend requests: \(error)")
         }
+    }
+    
+    @MainActor
+    func declineFriendRequest(userID: Int, friendID: Int, auth: Auth) async {
+        do {
+            try? await userService.rejectFriend(userID: userID, friendID: friendID, accessToken: auth.accessToken ?? "")
+        }
+        
+        pendingFriends.removeAll { $0.id == friendID }
     }
 }

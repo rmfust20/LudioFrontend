@@ -13,6 +13,7 @@ enum AppRoute: Hashable {
     case addGameNight(id: Int)
     case profile(id: Int)
     case gameNightFeed(userOnly: Bool)
+    case gameNight(id: Int)
 }
 
 struct AppNavRouter<Root: View>: View {
@@ -46,6 +47,8 @@ struct AppNavRouter<Root: View>: View {
             ProfileView(userID: id)
         case .gameNightFeed(let userOnly):
             GameNightFeedView(userOnly: userOnly)
+        case .gameNight(let id):
+            GameNightDetailView(gameNightID: id)
         }
     }
 }

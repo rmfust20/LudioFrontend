@@ -95,6 +95,20 @@ struct GameNightService {
         return userBoardGames
     }
     
+    func getGameNight(id: Int) async throws -> GameNightModel {
+        var components = URLComponents(string: baseURL)
+        components?.path = "/gameNights/\(id)"
+        guard let url = components?.url else { throw APIError.invalidURL }
+
+        var request = URLRequest(url: url)
+        let (data, response) = try await client.getSession().data(for: request)
+
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
+
+        return try JSONDecoder().decode(GameNightModel.self, from: data)
+    }
+
     func getUserGameNights(userID: Int) async throws -> [GameNightModel] {
         print("gettingUserGameNights")
         var components = URLComponents(string: baseURL)

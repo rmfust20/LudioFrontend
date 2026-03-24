@@ -11,7 +11,7 @@ struct RegisterView: View {
     let userID: Int
     @EnvironmentObject var auth : Auth
     @EnvironmentObject var userViewModel : UserViewModel
-    @State private var username: String = "cow1"
+    @State private var username: String = "cow2"
     @State private var email : String = "robertfusting@gmail.com0000"
     @State private var password: String = "bobeeeqwhru382ee"
     var body: some View {
@@ -21,7 +21,7 @@ struct RegisterView: View {
             }
         } label: {
             Text("Register")
-        }
+        }.buttonStyle(.plain)
         
         Button {
             Task {
@@ -30,13 +30,13 @@ struct RegisterView: View {
         }
         label : {
             Text("Login")
-        }
+        }.buttonStyle(.plain)
         
         Button {
             auth.printUsername()
         } label: {
             Text("Press me")
-        }
+        }.buttonStyle(.plain)
     }
 }
 

@@ -12,98 +12,218 @@ struct HomeView: View {
     @EnvironmentObject private var auth: Auth
     @StateObject var homeFeedViewModel = HomeFeedViewModel()
     @ObservedObject var reviewViewModel = ReviewViewModel()
-    @State private var showStars: Bool = false
-    let userID = 1
+
     var body: some View {
-        //SearchView()
-            //.padding(.vertical,-10)
         ZStack {
-            Color("SoftOffWhite")
-            ScrollView {
-                LazyVStack {
-                    ForEach(homeFeedViewModel.boardGames) { boardGame in
-                        Button {router.push(.boardGame(id: boardGame.id))} label: {
-                            BoardGameCardView(boardGame: boardGame, showStars: $showStars, cardImage: ImageCache.shared.getImage(for: boardGame.id))
+            Color("CharcoalBackground").ignoresSafeArea()
+
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    // Header
+                    HStack(alignment: .bottom) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Trending Games")
+                                .font(.system(size: 30, weight: .bold))
+                                .foregroundStyle(Color.white)
                         }
-                        .buttonStyle(.plain)
-                            .onAppear() {
-                                Task {
-                                    await homeFeedViewModel.updateImageCache(boardGame: boardGame)
-                                }
-                                if boardGame.id == homeFeedViewModel.boardGames.last?.id {
-                                    Task { await homeFeedViewModel.fetchBoardGamesFromNetwork(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "")
-                                    }
-                                }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                    .padding(.bottom, 20)
+
+                    VStack(spacing: 20) {
+                        ForEach(homeFeedViewModel.boardGames) { boardGame in
+                            Button {
+                                router.push(.boardGame(id: boardGame.id))
+                            } label: {
+                                FeedCard(boardGame: boardGame)
                             }
+                            //.buttonStyle(.plain)
+                        }
                     }
                 }
             }
-            .onAppear() {
+            .onAppear {
                 Task {
-                    await homeFeedViewModel.fetchBoardGames(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "")
+                    await homeFeedViewModel.tempGetBoardGameFeed(
+                        accessToken: auth.accessToken ?? ""
+                    )
                 }
             }
-            AddStars(isPresented: $showStars)
-            
+
         }
     }
 }
 
-struct AddStars: View {
-    let bookTitle: String = "Sample Book"
-    @Binding var isPresented: Bool
+// MARK: - Feed Card
+
+private struct FeedCard: View {
+    let boardGame: BoardGameModel
+
     var body: some View {
-        if isPresented {
-            VStack {
-                Spacer()
-                List {
-                    HStack{
-                        Spacer()
-                        Text(bookTitle)
-                            .font(.system(size:12))
-                            .foregroundStyle(Color.gray)
-                        Spacer()
-                    }
-                    .alignmentGuide(.listRowSeparatorLeading) { dimensions in
-                        dimensions[.leading]
-                    }
-                    ForEach(1...5, id: \.self) { index in
-                        HStack {
-                            Spacer()
-                            ForEach(1...index, id:\.self) { star_count in
-                                Image(systemName: "star.fill")
-                                    .foregroundStyle(Color.gray)
-                                    .padding(.trailing,-10)
-                            }
-                            Text("\(index) Stars" )
-                                .padding(.leading,5)
-                            Spacer()
-                        }
-                        .alignmentGuide(.listRowSeparatorLeading) { dimensions in
-                            dimensions[.leading]
-                        }
-                    }
-                    HStack{
-                        Spacer()
-                        Button {
-                            withAnimation(.spring(response:0.50)) {
-                                isPresented = false
-                            }
-                        } label : {
-                            Text("Cancel")
-                        }
-                        Spacer()
+        VStack(alignment: .leading, spacing: 0) {
+            // Image with gradient + title overlay
+            ZStack(alignment: .bottomLeading) {
+                AsyncImage(url: URL(string: boardGame.image ?? "")) { phase in
+                    if let image = phase.image {
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.12))
+                            .overlay(
+                                Image(systemName: "photo")
+                                    .font(.system(size: 40))
+                                    .foregroundStyle(Color.gray.opacity(0.3))
+                            )
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: UIScreen.main.bounds.height / 2)
-                
+                .frame(maxWidth: .infinity)
+                .frame(height: 154)
+                .clipped()
+
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.7)],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+                .frame(height: 154)
+
+                Text(boardGame.name)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 10)
             }
-            .transition(.move(edge: .bottom))
+
+            // Metadata + rate row
+            HStack(spacing: 8) {
+                if let min = boardGame.min_players, let max = boardGame.max_players {
+                    MetaBadge(icon: "person.2.fill", label: "\(min)–\(max)")
+                }
+                if let time = boardGame.play_time, time > 0 {
+                    MetaBadge(icon: "clock.fill", label: "\(time) min")
+                }
+                if let year = boardGame.year_published {
+                    MetaBadge(icon: "calendar", label: "\(year)")
+                }
+
+                Spacer()
+
+                HStack(spacing: 4) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 10))
+                    Text("Rate")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(Color("PrimaryButton"))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Color("PrimaryButton").opacity(0.12))
+                .clipShape(Capsule())
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 13)
+            .background(Color("CardSurface"))
         }
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: .black.opacity(0.09), radius: 12, x: 0, y: 4)
     }
 }
+
+// MARK: - Friends Trending Card
+
+private struct FriendsTrendingCard: View {
+    let boardGame: BoardGameModel
+    let cardImage: UIImage?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Group {
+                if let image = cardImage {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.12))
+                        .overlay(
+                            Image(systemName: "photo")
+                                .font(.system(size: 20))
+                                .foregroundStyle(Color.gray.opacity(0.3))
+                        )
+                }
+            }
+            .frame(width: 64, height: 64)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 4) {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Color("PrimaryButton"))
+                    Text("TRENDING WITH FRIENDS")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Color("PrimaryButton"))
+                        .tracking(1)
+                }
+                Text(boardGame.name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                if let time = boardGame.play_time, time > 0,
+                   let min = boardGame.min_players, let max = boardGame.max_players {
+                    Text("\(min)–\(max) players · \(time) min")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color("MutedText"))
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color("MutedText"))
+        }
+        .padding(14)
+        .background(Color("CardSurface"))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 3)
+    }
+}
+
+// MARK: - Meta Badge
+
+private struct MetaBadge: View {
+    let icon: String
+    let label: String
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 10))
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+        }
+        .foregroundStyle(Color("MutedText"))
+    }
+}
+
+// MARK: - Add Stars Sheet
 
 
 #Preview {
-  HomeView()
+    let auth = Auth()
+    auth.setSession(AuthResponse(
+        access_token: "preview-token",
+        refresh_token: "preview-refresh",
+        token_type: "bearer",
+        user: RegisterResponse(username: "previewUser", id: 1)
+    ))
+    return HomeView()
+        .environmentObject(auth)
+        .environmentObject(AppRouter())
 }

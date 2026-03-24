@@ -20,6 +20,7 @@ class HomeFeedViewModel : ObservableObject {
     
     
     @Published var boardGames: [BoardGameModel] = []
+    @Published var friendGames: [BoardGameModel] = []
     private let boardGameService: BoardGameService
     @Published var LastSeenID: Int = 0
     
@@ -67,11 +68,14 @@ class HomeFeedViewModel : ObservableObject {
                     trendingGamesFriends.append(boardGame)
                 }
             }
-            
+
+            self.friendGames = trendingGamesFriends.uniqued()
+
             let combined = (trendingGames + trendingGamesFriends).sorted { $0.id < $1.id }
-            
-            self.boardGames = combined
-            self.boardGames = self.boardGames.uniqued()
+            let newGames = combined.uniqued().filter { !self.friendGames.contains($0) }
+            let existingIDs = Set(self.boardGames.map { $0.id })
+            let trulyNew = newGames.filter { !existingIDs.contains($0.id) }
+            self.boardGames.append(contentsOf: trulyNew)
             LastSeenID += 25
             
             return boardGames
@@ -89,6 +93,14 @@ class HomeFeedViewModel : ObservableObject {
                 }
             }
         }
+    
+    @MainActor
+    func tempGetBoardGameFeed(accessToken: String) async {
+        let feed = try? await boardGameService.fetchGeneralTrendingFeed(accessToken: accessToken)
+        if let feed = feed {
+            self.boardGames = feed
+        }
+    }
     }
 
     

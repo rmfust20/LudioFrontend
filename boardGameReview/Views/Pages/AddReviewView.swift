@@ -10,30 +10,61 @@ import SwiftUI
 struct AddReviewView: View {
     let boardGameID: Int
     @EnvironmentObject private var router: AppRouter
-    @EnvironmentObject private var auth : Auth
+    @EnvironmentObject private var auth: Auth
     @State var rating: Int
     @State private var text: String = ""
     @StateObject private var reviewViewModel = ReviewViewModel()
+
     var body: some View {
-        HStack {
-            Text("Your Rating:")
-                .font(.title)
-            FlexStarsView(rating: $rating, size: 30, interactive: true)
-        }
-        .padding(.top,10)
-        Rectangle()
-            .stroke(Color.gray)
-            .frame(height:1)
-        ZStack(alignment: .topLeading) {
-            TextEditor(text: $text)
-                .padding()
-            if text.isEmpty {
-                Text("Write your review here...")
-                    .foregroundColor(.gray)
-                    .opacity(0.50)
-                    .padding()
-                    .padding(.top,8)
+        ZStack {
+            Color("CharcoalBackground").ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                // Rating card
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Your Rating")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color("MutedText"))
+                        .tracking(0.5)
+                    FlexStarsView(rating: $rating, size: 30, interactive: true)
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color("CardSurface"))
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .shadow(color: .black.opacity(0.09), radius: 12, x: 0, y: 4)
+
+                // Review text card
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Your Review")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color("MutedText"))
+                        .tracking(0.5)
+
+                    ZStack(alignment: .topLeading) {
+                        TextEditor(text: $text)
+                            .scrollContentBackground(.hidden)
+                            .background(Color.clear)
+                            .foregroundStyle(.white)
+                            .frame(minHeight: 160)
+                        if text.isEmpty {
+                            Text("Write your review here...")
+                                .foregroundStyle(Color("MutedText"))
+                                .padding(.top, 8)
+                                .padding(.leading, 4)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                }
+                .padding(20)
+                .background(Color("CardSurface"))
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .shadow(color: .black.opacity(0.09), radius: 12, x: 0, y: 4)
+
+                Spacer()
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 20)
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -47,15 +78,17 @@ struct AddReviewView: View {
                             rating: rating,
                             comment: text
                         )
-                        
+
                         do {
-                            try await reviewViewModel.postReview(reviewModel,accessToken: auth.accessToken ?? "")
+                            try await reviewViewModel.postReview(reviewModel, accessToken: auth.accessToken ?? "")
                             router.pop()
                         } catch {
                             print("Error posting review: \(error)")
                         }
                     }
                 }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color("PrimaryButton"))
             }
         }
     }

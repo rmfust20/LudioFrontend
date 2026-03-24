@@ -6,34 +6,32 @@ struct ReviewCardView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-
             Image("userProfile")
                 .resizable()
                 .scaledToFill()
-                .frame(width: 56, height: 56)
+                .frame(width: 44, height: 44)
                 .clipShape(Circle())
 
-            VStack(alignment: .leading, spacing: 6) {
-
+            VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
                     Text(reviewModel.username)
-                        .font(.headline)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
 
                     Text("rated it")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color("MutedText"))
 
-
-                    FlexStarsView(rating:.constant( reviewModel.rating), size: 13, interactive: false)
+                    FlexStarsView(rating: .constant(reviewModel.rating), size: 12, interactive: false)
                 }
 
                 Text(reviewModel.comment ?? "")
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true) // allows wrapping
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 14)
     }
 }
 
@@ -41,5 +39,5 @@ struct ReviewCardView: View {
     ReviewCardView(
         reviewModel: ReviewModel(id: 0, board_game_id: 0, user_id: 0, username: "rmfust50", rating: 4, comment: "Great game!")
     )
+    .background(Color("CardSurface"))
 }
-
