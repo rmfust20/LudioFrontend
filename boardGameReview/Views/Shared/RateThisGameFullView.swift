@@ -19,18 +19,18 @@ struct RateThisGameFullView: View {
         .onDisappear {
             Task {
                 do {
-                    if let existing = review {
+                    if let existing = review, let reviewID = existing.id {
                         if rating == 0 && existing.comment == nil {
                             // No rating and no comment — delete the review
                             try await reviewViewModel.deleteReview(
-                                reviewID: existing.id!,
+                                reviewID: reviewID,
                                 accessToken: auth.accessToken ?? ""
                             )
                         } else if rating > 0 && rating != existing.rating {
                             // Rating changed — update it
                             try await reviewViewModel.updateReview(
-                                reviewID: existing.id!,
-                                review: ReviewUpdate(id: existing.id!, rating: rating),
+                                reviewID: reviewID,
+                                review: ReviewUpdate(id: reviewID, rating: rating),
                                 accessToken: auth.accessToken ?? ""
                             )
                         }

@@ -7,9 +7,11 @@
 import Foundation
 
 class GameNightViewModel: ObservableObject {
-    
+
     private let boardGameService: BoardGameService
     private let gameNightService: GameNightService
+    private let userService: UserService
+    private let imageService: ImageService
     @Published var selectedGames: [BoardGameModel] = []
     @Published var userFriends: [UserPublicModel] = []
     @Published var filteredFriends: [UserPublicModel] = []
@@ -17,15 +19,19 @@ class GameNightViewModel: ObservableObject {
     @Published var gameNightDurations: [Int:Int] = [:]
     @Published var description: String = ""
     @Published var selectedWinners : [Int:[Int]] = [:]
-    
-    init(boardGameService: BoardGameService = BoardGameService(), gameNightService: GameNightService = GameNightService()) {
+    @Published var uploadError: String?
+    @Published var friendProfileImages: [Int: String] = [:]
+
+    init(boardGameService: BoardGameService = BoardGameService(), gameNightService: GameNightService = GameNightService(), userService: UserService = UserService(), imageService: ImageService = ImageService()) {
         self.boardGameService = boardGameService
         self.gameNightService = gameNightService
+        self.userService = userService
+        self.imageService = imageService
     }
     
     @MainActor
-    func fetchBoardGame(_ boardGameID : Int) async -> BoardGameModel? {
-        let fetchedBoardGame = try? await boardGameService.fetchBoardGame(boardGameID: boardGameID)
+    func fetchBoardGame(_ boardGameID: Int, accessToken: String) async -> BoardGameModel? {
+        let fetchedBoardGame = try? await boardGameService.fetchBoardGame(boardGameID: boardGameID, accessToken: accessToken)
         if let fetchedBoardGame = fetchedBoardGame {
             return fetchedBoardGame
         }
@@ -47,12 +53,28 @@ class GameNightViewModel: ObservableObject {
     }
     
     @MainActor
-    func getUserFriends(userID: Int) async {
-        let friends = try? await gameNightService.getUserFriends(userID: userID)
+    func getUserFriends(userID: Int, accessToken: String) async {
+        let friends = try? await gameNightService.getUserFriends(userID: userID, accessToken: accessToken)
         if let friends = friends {
             self.userFriends = friends
             self.filteredFriends = friends
+            friendProfileImages = await fetchProfileImages(for: friends.map { $0.id }, accessToken: accessToken)
         }
+    }
+
+    private func fetchProfileImages(for userIDs: [Int], accessToken: String) async -> [Int: String] {
+        let profiles = (try? await userService.getUsers(userIDs: userIDs, accessToken: accessToken)) ?? []
+        let blobEntries: [(Int, String)] = profiles.compactMap { p in
+            guard let blob = p.profile_image_url else { return nil }
+            return (p.id, blob)
+        }
+        guard !blobEntries.isEmpty else { return [:] }
+        let urls = (try? await imageService.getImageURLs(blobNames: blobEntries.map { $0.1 }, accessToken: accessToken)) ?? []
+        var result: [Int: String] = [:]
+        for (index, (userID, _)) in blobEntries.enumerated() where index < urls.count {
+            result[userID] = urls[index]
+        }
+        return result
     }
     
     @MainActor
@@ -137,10 +159,11 @@ class GameNightViewModel: ObservableObject {
         return sessions
         }
     
+    @MainActor
     func uploadGameNight(auth: Auth, images: [UploadImagesResponse.UploadedFile]) async {
-        
+        uploadError = nil
         let blobNames = images.compactMap { $0.blob_name }
-        
+
         let gameNightUploadModel = GameNightUploadModel(
             host_user_id: auth.userID ?? 0,
             description: self.description,
@@ -148,13 +171,11 @@ class GameNightViewModel: ObservableObject {
             images: blobNames,
             sessions: getGameNightSessions(),
             users: selectedFriends.compactMap {$0.id})
-        
+
         do {
             try await gameNightService.postGameNight(gameNight: gameNightUploadModel, accessToken: auth.accessToken ?? "")
         } catch {
-            print("uploadGameNight failed:", error)
+            uploadError = "Failed to post game night. Please try again."
         }
-
-            
     }
 }

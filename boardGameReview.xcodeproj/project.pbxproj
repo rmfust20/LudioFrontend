@@ -14,9 +14,22 @@
 		B65E0AA42EE4A75900836F59 /* boardGameReview.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = boardGameReview.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B6A21CD82F79A7DE002826DF /* Exceptions for "boardGameReview" folder in "boardGameReview" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B65E0AA32EE4A75900836F59 /* boardGameReview */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B65E0AA62EE4A75900836F59 /* boardGameReview */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B6A21CD82F79A7DE002826DF /* Exceptions for "boardGameReview" folder in "boardGameReview" target */,
+			);
 			path = boardGameReview;
 			sourceTree = "<group>";
 		};
@@ -264,6 +277,7 @@
 				DEVELOPMENT_TEAM = FZ8JM6H768;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = boardGameReview/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -293,6 +307,7 @@
 				DEVELOPMENT_TEAM = FZ8JM6H768;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = boardGameReview/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

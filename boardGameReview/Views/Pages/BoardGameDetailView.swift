@@ -58,7 +58,7 @@ struct BoardGameDetailView: View {
                             await boardGameViewModel.presentImage()
                             boardGame = boardGameViewModel.boardGame
                             cardImage = boardGameViewModel.boardGameImage
-                            designers = await boardGameViewModel.getBoardGameDesigners()
+                            designers = await boardGameViewModel.getBoardGameDesigners(accessToken: auth.accessToken ?? "")
                         }
                     }
 

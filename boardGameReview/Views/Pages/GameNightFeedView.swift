@@ -11,12 +11,13 @@ struct GameNightFeedView: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var auth: Auth
     @StateObject private var gameNightFeedViewModel = GameNightFeedViewModel()
-    let userOnly: Bool
+    @State private var isLoading: Bool = true
+    let userOnly: Int?
     var body: some View {
         ZStack {
             Color("CharcoalBackground").ignoresSafeArea()
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     HStack {
                         Text("Game Nights")
                             .font(.system(size: 30, weight: .bold))
@@ -37,8 +38,8 @@ struct GameNightFeedView: View {
                     .padding(.top, 20)
                     .padding(.bottom, 20)
 
-                    LazyVStack(spacing: 16) {
-                        if gameNightFeedViewModel.gameNights.isEmpty {
+                    VStack(spacing: 16) {
+                        if gameNightFeedViewModel.gameNightPresent.isEmpty && !isLoading {
                             VStack(spacing: 12) {
                                 Image(systemName: "person.2.slash")
                                     .font(.system(size: 40))
@@ -50,45 +51,20 @@ struct GameNightFeedView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 60)
-                            .onAppear {
-                                Task {
-                                    if userOnly == true {
-                                        await gameNightFeedViewModel.fetchUserGameNights(userID: auth.userID ?? 1)
-                                    } else {
-                                        await gameNightFeedViewModel.fetchGameNights(userID: auth.userID ?? 1)
+                        }
+                        ForEach(gameNightFeedViewModel.gameNightPresent) { gameNight in
+                            GameNightCardView(gameNight: gameNight)
+                        }
+                        if !isLoading {
+                            Color.clear
+                                .frame(height: 1)
+                                .onAppear {
+                                    Task {
+                                        await gameNightFeedViewModel.loadMore(userID: auth.userID ?? 1, userOnly: userOnly, accessToken: auth.accessToken ?? "")
                                     }
                                 }
-                            }
-                        }
-                        ForEach(gameNightFeedViewModel.gameNights) { gameNight in
-                            GameNightCardView(
-                                gameNight: gameNight,
-                                boardGames: gameNightFeedViewModel.boardGames
-                                    .filter { gameNight.sessions.map { $0.board_game_id }.contains($0.key) }
-                                    .map { ($0.key, $0.value) }
-                            )
-                        }
-                        .onAppear {
-                            Task {
-                                if userOnly == true {
-                                    await gameNightFeedViewModel.fetchUserGameNights(userID: auth.userID ?? 1)
-                                } else {
-                                    await gameNightFeedViewModel.fetchGameNights(userID: auth.userID ?? 1)
-                                }
-                                async let boardGames: () = gameNightFeedViewModel.fetchBoardGameDetails()
-                                async let imageURLs: () = {
-                                    await withTaskGroup(of: Void.self) { group in
-                                        for gameNight in await gameNightFeedViewModel.gameNights {
-                                            let id = gameNight.id
-                                            let blobNames = gameNight.images ?? []
-                                            group.addTask {
-                                                await gameNightFeedViewModel.fetchImageURLFromBlob(id: id, blobNames: blobNames)
-                                            }
-                                        }
-                                    }
-                                }()
-                                await boardGames
-                                await imageURLs
+                            if gameNightFeedViewModel.isFetchingMore {
+                                ProgressView().tint(.white).padding(.vertical, 8)
                             }
                         }
                     }
@@ -97,6 +73,39 @@ struct GameNightFeedView: View {
                 }
             }
         }
+        .overlay {
+            if isLoading {
+                Color("CharcoalBackground").ignoresSafeArea()
+                ProgressView().tint(.white)
+            }
+        }
+        .task {
+            guard gameNightFeedViewModel.gameNightPresent.isEmpty else { return }
+            await loadFeed()
+        }
+        .onChange(of: router.gameNightPosted) {
+            guard router.gameNightPosted else { return }
+            router.gameNightPosted = false
+            Task { await loadFeed() }
+        }
+    }
+
+    private func loadFeed() async {
+        isLoading = true
+        gameNightFeedViewModel.gameNightPresent = []
+        let token = auth.accessToken ?? ""
+        if let userOnly {
+            await gameNightFeedViewModel.fetchUserGameNights(userID: userOnly, accessToken: token)
+        } else {
+            await gameNightFeedViewModel.fetchGameNights(userID: auth.userID ?? 1, accessToken: token)
+        }
+        let nights = gameNightFeedViewModel.gameNights
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await gameNightFeedViewModel.fetchUserProfileImages(for: nights, accessToken: token) }
+            group.addTask { await gameNightFeedViewModel.fetchAllGameNightImages(for: nights, accessToken: token) }
+        }
+        await gameNightFeedViewModel.prepareFinalModel()
+        isLoading = false
     }
 }
 
@@ -108,7 +117,7 @@ struct GameNightFeedView: View {
         token_type: "bearer",
         user: RegisterResponse(username: "previewUser", id: 2)
     ))
-    return GameNightFeedView(userOnly: false)
+    return GameNightFeedView(userOnly: nil)
         .environmentObject(auth)
         .environmentObject(AppRouter())
 }

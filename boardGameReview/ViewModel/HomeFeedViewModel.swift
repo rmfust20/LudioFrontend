@@ -17,13 +17,13 @@ extension Array where Element: Hashable {
 }
 
 class HomeFeedViewModel : ObservableObject {
-    
-    
     @Published var boardGames: [BoardGameModel] = []
     @Published var friendGames: [BoardGameModel] = []
+    @Published private(set) var isFetchingMore = false
     private let boardGameService: BoardGameService
-    @Published var LastSeenID: Int = 0
-    
+    private var offset = 0
+    private var hasMore = true
+
     init(boardGameService: BoardGameService = BoardGameService()) {
         self.boardGameService = boardGameService
     }
@@ -76,8 +76,7 @@ class HomeFeedViewModel : ObservableObject {
             let existingIDs = Set(self.boardGames.map { $0.id })
             let trulyNew = newGames.filter { !existingIDs.contains($0.id) }
             self.boardGames.append(contentsOf: trulyNew)
-            LastSeenID += 25
-            
+
             return boardGames
         }
         
@@ -96,9 +95,37 @@ class HomeFeedViewModel : ObservableObject {
     
     @MainActor
     func tempGetBoardGameFeed(accessToken: String) async {
-        let feed = try? await boardGameService.fetchGeneralTrendingFeed(accessToken: accessToken)
-        if let feed = feed {
+        offset = 0
+        hasMore = true
+        let feed = try? await boardGameService.fetchGeneralTrendingFeed(accessToken: accessToken, offset: 0)
+        if let feed {
             self.boardGames = feed
+            self.offset = feed.count
+        }
+    }
+
+    func loadMore(accessToken: String) async {
+        guard !isFetchingMore, hasMore else { return }
+        await MainActor.run { isFetchingMore = true }
+
+        let newGames = try? await boardGameService.fetchGeneralTrendingFeed(accessToken: accessToken, offset: offset)
+
+        guard let newGames, !newGames.isEmpty else {
+            await MainActor.run { hasMore = false; isFetchingMore = false }
+            return
+        }
+
+        let existingIDs = Set(boardGames.map { $0.id })
+        let dedupedGames = newGames.filter { !existingIDs.contains($0.id) }
+        guard !dedupedGames.isEmpty else {
+            await MainActor.run { hasMore = false; isFetchingMore = false }
+            return
+        }
+
+        await MainActor.run {
+            boardGames.append(contentsOf: dedupedGames)
+            offset += newGames.count
+            isFetchingMore = false
         }
     }
     }

@@ -8,20 +8,23 @@
 import SwiftUI
 
 struct GameNightCardView: View {
-    let gameNight: GameNightModel
-    let imageService: ImageService = ImageService()
-    let boardGames: [(Int, String)]
+    let gameNight: GameNightFeedModel
     var onDelete: (() -> Void)? = nil
     @EnvironmentObject private var auth: Auth
     @EnvironmentObject private var router: AppRouter
-    @State private var gameNightImages: [String] = []
-    @State private var profileImageURL: String? = nil
-    @State private var hostUsername: String = ""
-    @State private var playerProfileImages: [Int: String?] = [:]
     @State private var showOptions: Bool = false
     @State private var showDeleteConfirm: Bool = false
-    private let userService = UserService()
+    @State private var showDeleteError: Bool = false
     private let gameNightService = GameNightService()
+
+    private var boardGames: [(id: Int, imageURL: String)] {
+        var seen = Set<Int>()
+        return gameNight.sessions.compactMap { session in
+            guard seen.insert(session.board_game.id).inserted,
+                  let image = session.board_game.image else { return nil }
+            return (session.board_game.id, image)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -29,25 +32,33 @@ struct GameNightCardView: View {
             // Header
             HStack(spacing: 12) {
                 Group {
-                    if let url = profileImageURL {
-                        AsyncImage(url: URL(string: url)) { image in
-                            image.resizable().scaledToFill()
-                        } placeholder: {
-                            ProgressView()
+                    if let url = gameNight.hostProfileImageURL {
+                        Button {router.push(.profile(id: gameNight.hostUserID, username: gameNight.hostUsername))} label : {
+                            AsyncImage(url: URL(string: url)) { image in
+                                image.resizable().scaledToFill()
+                            } placeholder: {
+                                ProgressView()
+                            }
                         }
                     } else {
-                        Image(systemName: "person.circle.fill")
-                            .resizable()
-                            .foregroundStyle(Color("MutedText"))
+                        Button {router.push(.profile(id: gameNight.hostUserID, username: gameNight.hostUsername))} label : {
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .foregroundStyle(Color("MutedText"))
+                        }
                     }
                 }
                 .frame(width: 42, height: 42)
                 .clipShape(Circle())
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(hostUsername)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                    Text(formattedDate(gameNight.game_night_date))
+                    Button {
+                        router.push(.profile(id: gameNight.hostUserID, username: gameNight.hostUsername))
+                    } label: {
+                        Text(gameNight.hostUsername)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }.buttonStyle(.plain)
+                    Text(formattedDate(gameNight.date))
                         .font(.system(size: 12))
                         .foregroundStyle(Color("MutedText"))
                 }
@@ -61,7 +72,7 @@ struct GameNightCardView: View {
                 }
                 .buttonStyle(.plain)
                 .confirmationDialog("", isPresented: $showOptions) {
-                    if gameNight.host_user_id == auth.userID {
+                    if gameNight.hostUserID == auth.userID {
                         Button("Delete Post", role: .destructive) {
                             showDeleteConfirm = true
                         }
@@ -73,56 +84,50 @@ struct GameNightCardView: View {
                 .alert("Delete Post?", isPresented: $showDeleteConfirm) {
                     Button("Delete", role: .destructive) {
                         Task {
-                            try? await gameNightService.deleteGameNight(gameNightID: gameNight.id, accessToken: auth.accessToken ?? "")
-                            onDelete?()
+                            do {
+                                try await gameNightService.deleteGameNight(gameNightID: gameNight.id, accessToken: auth.accessToken ?? "")
+                                onDelete?()
+                            } catch {
+                                showDeleteError = true
+                            }
                         }
                     }
                     Button("Cancel", role: .cancel) { }
                 } message: {
                     Text("This will permanently delete this game night post.")
                 }
+                .alert("Delete Failed", isPresented: $showDeleteError) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text("Failed to delete this post. Please try again.")
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
 
             // Game night photos
-            if !gameNightImages.isEmpty {
-                if gameNightImages.count == 1, let urlString = gameNightImages.first {
-                    AsyncImage(url: URL(string: urlString)) { image in
-                        image.resizable().scaledToFill()
-                    } placeholder: {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.12))
-                            .overlay(ProgressView())
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 220)
-                    .clipped()
-                } else {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(gameNightImages, id: \.self) { urlString in
-                                AsyncImage(url: URL(string: urlString)) { image in
-                                    image.resizable().scaledToFill()
-                                } placeholder: {
-                                    Rectangle()
-                                        .fill(Color.gray.opacity(0.12))
-                                        .overlay(ProgressView())
-                                }
-                                .frame(width: 200, height: 200)
-                                .clipped()
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            if !gameNight.photos.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(gameNight.photos, id: \.self) { urlString in
+                            AsyncImage(url: URL(string: urlString)) { image in
+                                image.resizable().scaledToFill()
+                            } placeholder: {
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.12))
+                                    .overlay(ProgressView())
                             }
+                            .frame(width: 200, height: 200)
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
-                        .padding(.horizontal, 14)
                     }
+                    .padding(.horizontal, 14)
                 }
             }
 
             // Players
-            let winnerIDs = Set(gameNight.sessions.flatMap { $0.winners_user_id }.compactMap { $0 })
-            let players = gameNight.users
-            if !players.isEmpty {
+            if !gameNight.players.isEmpty {
                 Text("PLAYERS")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(Color("MutedText"))
@@ -132,40 +137,44 @@ struct GameNightCardView: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 14) {
-                        ForEach(players, id: \.id) { player in
-                            let isWinner = winnerIDs.contains(player.id)
-                            ZStack(alignment: .bottom) {
-                                Group {
-                                    if let entry = playerProfileImages[player.id], let url = entry {
-                                        AsyncImage(url: URL(string: url)) { image in
-                                            image.resizable().scaledToFill()
-                                        } placeholder: {
-                                            ProgressView()
+                        ForEach(gameNight.players) { player in
+                            Button {
+                                router.push(.profile(id: player.id, username: player.username))
+                            } label: {
+                                ZStack(alignment: .bottom) {
+                                    Group {
+                                        if let url = player.profileImageURL {
+                                            AsyncImage(url: URL(string: url)) { image in
+                                                image.resizable().scaledToFill()
+                                            } placeholder: {
+                                                ProgressView()
+                                            }
+                                        } else {
+                                            Image(systemName: "person.circle.fill")
+                                                .resizable()
+                                                .foregroundStyle(Color("MutedText"))
                                         }
-                                    } else {
-                                        Image(systemName: "person.circle.fill")
-                                            .resizable()
-                                            .foregroundStyle(Color("MutedText"))
+                                    }
+                                    .frame(width: 44, height: 44)
+                                    .clipShape(Circle())
+                                    .overlay(
+                                        Circle().stroke(player.isWinner ? Color.yellow : Color.clear, lineWidth: 2.5)
+                                    )
+
+                                    if player.isWinner {
+                                        Text("Winner")
+                                            .font(.system(size: 7, weight: .bold))
+                                            .foregroundStyle(.black)
+                                            .padding(.horizontal, 4)
+                                            .padding(.vertical, 2)
+                                            .background(Color.yellow)
+                                            .clipShape(Capsule())
+                                            .offset(y: 8)
                                     }
                                 }
-                                .frame(width: 44, height: 44)
-                                .clipShape(Circle())
-                                .overlay(
-                                    Circle().stroke(isWinner ? Color.yellow : Color.clear, lineWidth: 2.5)
-                                )
-
-                                if isWinner {
-                                    Text("Winner")
-                                        .font(.system(size: 7, weight: .bold))
-                                        .foregroundStyle(.black)
-                                        .padding(.horizontal, 4)
-                                        .padding(.vertical, 2)
-                                        .background(Color.yellow)
-                                        .clipShape(Capsule())
-                                        .offset(y: 8)
-                                }
+                                .padding(.bottom, player.isWinner ? 8 : 0)
                             }
-                            .padding(.bottom, isWinner ? 8 : 0)
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, 14)
@@ -184,18 +193,18 @@ struct GameNightCardView: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(boardGames, id: \.0) { item in
+                        ForEach(boardGames, id: \.id) { item in
                             Button {
-                                router.push(.boardGame(id: item.0))
+                                router.push(.boardGame(id: item.id))
                             } label: {
-                                AsyncImage(url: URL(string: item.1)) { image in
+                                AsyncImage(url: URL(string: item.imageURL)) { image in
                                     image.resizable().scaledToFill()
                                 } placeholder: {
                                     Rectangle()
                                         .fill(Color.gray.opacity(0.12))
                                         .overlay(ProgressView())
                                 }
-                                .frame(width: gameNightImages.isEmpty ? 90 : 56, height: gameNightImages.isEmpty ? 90 : 56)
+                                .frame(width: gameNight.photos.isEmpty ? 90 : 56, height: gameNight.photos.isEmpty ? 90 : 56)
                                 .clipped()
                                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             }
@@ -207,51 +216,19 @@ struct GameNightCardView: View {
             }
 
             // Description
-            Text(gameNight.description ?? "")
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.8))
-                .multilineTextAlignment(.leading)
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
-                .padding(.bottom, 14)
+            if let description = gameNight.description, !description.isEmpty {
+                Text(description)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .multilineTextAlignment(.leading)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+            }
         }
+        .padding(.bottom,14)
         .background(Color("CardSurface"))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 4)
-        .onAppear {
-            Task {
-                if let images = gameNight.images {
-                    let trueImages = try? await imageService.getImageURLs(blobNames: images)
-                    if let trueImages = trueImages {
-                        gameNightImages = trueImages
-                    }
-                }
-                if let user = try? await userService.getUser(userID: gameNight.host_user_id) {
-                    hostUsername = user.username ?? "Loading"
-                    if let blobName = user.profile_image_url {
-                        profileImageURL = try? await imageService.getImageURL(blobName: blobName)
-                    }
-                }
-                let winnerIDs = Array(Set(gameNight.sessions.flatMap { $0.winners_user_id }.compactMap { $0 }))
-                let playerIDs = gameNight.users.map { $0.id }
-                let allIDs = Array(Set(playerIDs + winnerIDs))
-                await withTaskGroup(of: (Int, String?).self) { group in
-                    for userID in allIDs {
-                        group.addTask {
-                            if let user = try? await userService.getUser(userID: userID),
-                               let blobName = user.profile_image_url {
-                                let url = try? await imageService.getImageURL(blobName: blobName)
-                                return (userID, url)
-                            }
-                            return (userID, nil)
-                        }
-                    }
-                    for await (userID, url) in group {
-                        playerProfileImages[userID] = url
-                    }
-                }
-            }
-        }
     }
 
     private func formattedDate(_ dateString: String) -> String {
@@ -270,16 +247,40 @@ struct GameNightCardView: View {
 
 #Preview {
     GameNightCardView(
-        gameNight: GameNightModel(
+        gameNight: GameNightFeedModel(
             id: 0,
-            host_user_id: 0,
-            game_night_date: "2024-05-09T19:00:00Z",
-            description: "Had a great time playing Catan with friends!",
-            sessions: [
-                GameNightSessionModel(board_game_id: 181, duration_minutes: 90, winners_user_id: [1, 2]),
+            hostUserID: 0,
+            hostUsername: "previewUser",
+            hostProfileImageURL: nil as String?,
+            date: "2024-05-09T19:00:00Z",
+            description: nil,
+            photos: [],
+            players: [
+                PlayerFeedModel(id: 1, username: "alice", profileImageURL: nil, isWinner: true),
+                PlayerFeedModel(id: 2, username: "bob", profileImageURL: nil, isWinner: false)
             ],
-            images: ["https://www.moongiant.com/images/todays_moon_phase.jpg", "https://upload.wikimedia.org/wikipedia/commons/1/10/Supermoon_Nov-14-2016-minneapolis.jpg", "https://media.wired.com/photos/5c425dd1ce277c2cb23d5667/master/pass/Blood-Moon-586081787.jpg"],
-            users: []
-        ), boardGames: [(181, "https://cf.geekdo-images.com/Oem1TTtSgxOghRFCoyWRPw__original/img/Nu3eXPyOkhtnR3hhpUrtgqRMAfs=/0x0/filters:format(jpeg)/pic4916782.jpg")]
+            sessions: [
+                GameNightSessionModel(
+                    board_game: BoardGameModel(
+                        id: 181,
+                        name: "Catan",
+                        thumbnail: nil,
+                        play_time: 90,
+                        min_players: 3,
+                        max_players: 4,
+                        year_published: 1995,
+                        description: nil,
+                        min_age: 10,
+                        image: "https://cf.geekdo-images.com/Oem1TTtSgxOghRFCoyWRPw__original/img/Nu3eXPyOkhtnR3hhpUrtgqRMAfs=/0x0/filters:format(jpeg)/pic4916782.jpg"
+                    ),
+                    duration_minutes: 90,
+                    winners_user_id: [1]
+                )
+            ]
+        )
     )
+    .environmentObject(Auth())
+    .environmentObject(AppRouter())
+    .padding()
+    .background(Color("CharcoalBackground"))
 }

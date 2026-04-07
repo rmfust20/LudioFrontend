@@ -22,7 +22,7 @@ class SearchViewModel {
         self.boardGameService = boardGameService
     }
 
-    func performSearch(searchText: String) {
+    func performSearch(searchText: String, accessToken: String) {
         searchTask?.cancel()
 
         guard !searchText.isEmpty else {
@@ -39,7 +39,7 @@ class SearchViewModel {
                     self.isLoading = false
                     return
                 }
-                let result = try await self.boardGameService.fetchBoardGames(name: searchText)
+                let result = try await self.boardGameService.fetchBoardGames(name: searchText, accessToken: accessToken)
                 guard !Task.isCancelled else {
                     self.isLoading = false
                     return

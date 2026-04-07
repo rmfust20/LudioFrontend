@@ -22,7 +22,7 @@ struct GameNightSessionUploadModel: Codable {
 }
 
 struct GameNightSessionModel: Codable {
-    let board_game_id: Int
+    let board_game: BoardGameModel
     let duration_minutes: Int?
     let winners_user_id: [Int?]
 }
@@ -41,5 +41,24 @@ struct GameNightModel : Codable, Identifiable {
     let description : String?
     let sessions : [GameNightSessionModel]
     let images : [String]?
-    let users : [UsersGameNightsModel]
+    let users : [UserProfileModel]
+}
+
+struct PlayerFeedModel: Identifiable {
+    let id: Int
+    let username: String
+    let profileImageURL: String?
+    let isWinner: Bool
+}
+
+struct GameNightFeedModel: Identifiable {
+    let id: Int
+    let hostUserID: Int
+    let hostUsername: String
+    let hostProfileImageURL: String?
+    let date: String
+    let description: String?
+    let photos: [String]
+    let players: [PlayerFeedModel]
+    let sessions: [GameNightSessionModel]
 }

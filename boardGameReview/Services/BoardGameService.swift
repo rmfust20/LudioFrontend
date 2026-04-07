@@ -11,35 +11,34 @@ struct BoardGameService {
         self.baseURL = "https://tabulusapp.bravegrass-0afbc7b6.westus2.azurecontainerapps.io"
     }
     
-    func fetchGeneralTrendingFeed(accessToken: String) async throws -> [BoardGameModel] {
+    func fetchGeneralTrendingFeed(accessToken: String, offset: Int = 0) async throws -> [BoardGameModel] {
         var components = URLComponents(string: baseURL)
         components?.path = "/boardGames/trendingFeed"
+        components?.queryItems = [URLQueryItem(name: "offset", value: "\(offset)")]
         guard let url = components?.url else { throw APIError.invalidURL }
-        
+
         var request = URLRequest(url: url)
-        //try client.authorizedRequest(&request, accessToken: accessToken)
-        
-        // ✅ Use the request, not the raw url
-        let (data, response) = try await client.getSession().data(for: request)
-        
-        
+        try client.authorizedRequest(&request, accessToken: accessToken)
+
+        let (data, response) = try await client.data(for: request)
+
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
-        
+
         let boardGames = try JSONDecoder().decode([BoardGameModel].self, from: data)
         return boardGames
     }
     
-    func fetchBoardGamesByIds(ids: [Int]) async throws -> [BoardGameModel] {
+    func fetchBoardGamesByIds(ids: [Int], accessToken: String) async throws -> [BoardGameModel] {
         var components = URLComponents(string: baseURL)
         components?.path = "/boardGames/boardGamesByIds"
         components?.queryItems = ids.map { URLQueryItem(name: "board_game_ids", value: String($0)) }
         guard let url = components?.url else { throw APIError.invalidURL }
         
-        let request = URLRequest(url: url)
-        //try client.authorizedRequest(&request, accessToken: accessToken)
-        
-        let (data, response) = try await client.getSession().data(for: request)
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+
+        let (data, response) = try await client.data(for: request)
         
         
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
@@ -60,7 +59,7 @@ struct BoardGameService {
         try client.authorizedRequest(&request, accessToken: accessToken)
         
         // ✅ Use the request, not the raw url
-        let (data, response) = try await client.getSession().data(for: request)
+        let (data, response) = try await client.data(for: request)
         
         
 
@@ -72,16 +71,16 @@ struct BoardGameService {
         return boardGames
     }
     
-    func fetchBoardGame(boardGameID: Int) async throws -> BoardGameModel {
+    func fetchBoardGame(boardGameID: Int, accessToken: String) async throws -> BoardGameModel {
         var components = URLComponents(string: baseURL)
         components?.path = "/boardGames/fetchBoardGame/\(boardGameID)"
         guard let url = components?.url else { throw APIError.invalidURL }
 
         var request = URLRequest(url: url)
-        //try client.authorizedRequest(&request, accessToken: accessToken)
+        try client.authorizedRequest(&request, accessToken: accessToken)
         
         // ✅ Use the request, not the raw url
-        let (data, response) = try await client.getSession().data(for: request)
+        let (data, response) = try await client.data(for: request)
         
         
 
@@ -94,7 +93,7 @@ struct BoardGameService {
 
     }
     
-    func fetchBoardGames(name: String) async throws -> [BoardGameModel] {
+    func fetchBoardGames(name: String, accessToken: String) async throws -> [BoardGameModel] {
         var components = URLComponents(string: baseURL)
         var pathAllowed = CharacterSet.urlPathAllowed
         pathAllowed.remove("/")
@@ -102,11 +101,11 @@ struct BoardGameService {
         components?.path = "/boardGames/search/\(encodedName)"
         guard let url = components?.url else { throw APIError.invalidURL }
 
-        let request = URLRequest(url: url)
-        //try client.authorizedRequest(&request, accessToken: accessToken)
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
         
         // ✅ Use the request, not the raw url
-        let (data, response) = try await client.getSession().data(for: request)
+        let (data, response) = try await client.data(for: request)
         
         
 
@@ -118,7 +117,7 @@ struct BoardGameService {
         return boardGames
     }
 
-    func fetchBoardGameFeedForUser(_ userID: String, _ url: inout String, _ lastSeenID: Int) async throws -> [BoardGameModel] {
+    func fetchBoardGameFeedForUser(_ userID: String, _ url: inout String, _ lastSeenID: Int, accessToken:String) async throws -> [BoardGameModel] {
         if lastSeenID > 0 {
             url += "?lastSeenID=\(lastSeenID)"
         }
@@ -126,9 +125,11 @@ struct BoardGameService {
         guard let url = URL(string: url) else {
             throw APIError.invalidURL
         }
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
 
 
-        let (data, response) = try await client.getSession().data(from: url)
+        let (data, response) = try await client.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw APIError.serverError(statusCode: (response as? HTTPURLResponse)?.statusCode ?? 0,
                                        message: "Server error")
@@ -137,7 +138,7 @@ struct BoardGameService {
         return try JSONDecoder().decode([BoardGameModel].self, from: data)
     }
     
-    func rehydrate(userID: Int, boardGameIds: [Int]) async throws -> [BoardGameModel] {
+    func rehydrate(userID: Int, boardGameIds: [Int], accessToken: String) async throws -> [BoardGameModel] {
             guard !boardGameIds.isEmpty else { return [] }
 
             var components = URLComponents(string: baseURL)
@@ -146,8 +147,10 @@ struct BoardGameService {
         
 
             guard let url = components?.url else { throw APIError.invalidURL }
+            var request = URLRequest(url: url)
+            try client.authorizedRequest(&request, accessToken: accessToken)
 
-        let (data, response) = try await client.getSession().data(from: url)
+            let (data, response) = try await client.data(for: request)
 
             guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
             guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
@@ -178,23 +181,22 @@ struct BoardGameService {
         return image
     }
     
-    func fetchBoardGameDesigners(_ boardGameID: Int) async throws -> [String] {
+    func fetchBoardGameDesigners(_ boardGameID: Int, accessToken: String) async throws -> [String] {
         var components = URLComponents(string: baseURL)
         components?.path = "/boardGames/designers/\(boardGameID)"
-        
+
         guard let url = components?.url else { throw APIError.invalidURL }
-        
-        let (data, response) = try await client.getSession().data(from: url)
-        
-        
+
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+
+        let (data, response) = try await client.data(for: request)
 
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
-        
 
         let designers = try JSONDecoder().decode([BoardGameDesingnerModel].self, from: data)
         return designers.map { $0.name }.sorted()
-        
     }
 }
 

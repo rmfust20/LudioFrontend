@@ -118,7 +118,7 @@ struct AddGameNightView: View {
                 SearchView(isPresented: $isPresented, selectedBoardGameID: $selectedBoardGameID)
                     .onChange(of: selectedBoardGameID) {
                         Task {
-                            let game = await gameNightViewModel.fetchBoardGame(selectedBoardGameID ?? -1)
+                            let game = await gameNightViewModel.fetchBoardGame(selectedBoardGameID ?? -1, accessToken: auth.accessToken ?? "")
                             if let game {
                                 gameNightViewModel.selectedGames.append(game)
                             }
@@ -145,6 +145,14 @@ struct AddGameNightView: View {
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             }
         }
+        .alert("Upload Failed", isPresented: Binding(
+            get: { gameNightViewModel.uploadError != nil },
+            set: { if !$0 { gameNightViewModel.uploadError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(gameNightViewModel.uploadError ?? "")
+        }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
@@ -155,7 +163,10 @@ struct AddGameNightView: View {
                             auth: auth, images: imageUploadViewModel.uploaded
                         )
                         isUploading = false
-                        router.pop()
+                        if gameNightViewModel.uploadError == nil {
+                            router.gameNightPosted = true
+                            router.pop()
+                        }
                     }
                 } label: {
                     Text("Save")
@@ -216,18 +227,6 @@ struct AddGameView: View {
                             }
                             .buttonStyle(.plain)
 
-                            Button {
-                                durationPresented.toggle()
-                            } label: {
-                                Text(gameNightViewModel.gameNightDurations[boardGame.id] != nil ? "Change Duration" : "Add Duration")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(Color("PrimaryButton"))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(Color("PrimaryButton").opacity(0.15))
-                                    .clipShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
                         }
                     }
                     Spacer()
@@ -311,9 +310,10 @@ struct TagFriends: View {
     @ObservedObject var gameNightViewModel: GameNightViewModel
     @Binding var isPresented: Bool
     @State var searchText: String = ""
-    @State var taggedFriends: [String] = []
     @State private var currentUser: UserPublicModel? = nil
+    @State private var currentUserProfileImageURL: String? = nil
     private let userService = UserService()
+    private let imageService = ImageService()
     @EnvironmentObject private var auth: Auth
 
     var body: some View {
@@ -360,6 +360,7 @@ struct TagFriends: View {
                                 winnerCaller: winnerCaller,
                                 friendName: "You",
                                 friendID: me.id,
+                                profileImageURL: currentUserProfileImageURL,
                                 isSelected: gameNightViewModel.handleIsSelected(friendID: me.id, winnerCaller: winnerCaller),
                                 onSelect: {
                                     gameNightViewModel.resolveToggleUser(me, winnerCaller: winnerCaller)
@@ -375,6 +376,7 @@ struct TagFriends: View {
                                 winnerCaller: winnerCaller,
                                 friendName: friend.username,
                                 friendID: friend.id,
+                                profileImageURL: gameNightViewModel.friendProfileImages[friend.id],
                                 isSelected: gameNightViewModel.handleIsSelected(friendID: friend.id, winnerCaller: winnerCaller),
                                 onSelect: {
                                     gameNightViewModel.resolveToggle(friend.id, winnerCaller: winnerCaller)
@@ -391,9 +393,13 @@ struct TagFriends: View {
         }
         .onAppear {
             Task {
-                await gameNightViewModel.getUserFriends(userID: auth.userID ?? 0)
-                if let user = try? await userService.getUser(userID: auth.userID ?? 0) {
+                await gameNightViewModel.getUserFriends(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "")
+                if let user = try? await userService.getUser(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "") {
                     currentUser = UserPublicModel(id: user.id, username: user.username ?? "")
+                    if let blobName = user.profile_image_url,
+                       let url = try? await imageService.getImageURL(blobName: blobName, accessToken: auth.accessToken ?? "") {
+                        currentUserProfileImageURL = url
+                    }
                 }
             }
         }
@@ -404,14 +410,11 @@ struct TagFriends: View {
 
 struct TaggedFriendListView: View {
     let winnerCaller: Int?
-    @State var friendImage: UIImage?
-    @State var friendName: String
-    @State var friendID: Int
+    let friendName: String
+    let friendID: Int
+    let profileImageURL: String?
     @State var isSelected: Bool
     let onSelect: () -> Void
-    @State private var profileImageURL: String? = nil
-    private let userService = UserService()
-    private let imageService = ImageService()
 
     var body: some View {
         HStack(spacing: 12) {
@@ -430,13 +433,6 @@ struct TaggedFriendListView: View {
             }
             .frame(width: 44, height: 44)
             .clipShape(Circle())
-            .onAppear {
-                Task {
-                    if let blobName = (try? await userService.getUser(userID: friendID))?.profile_image_url {
-                        profileImageURL = try? await imageService.getImageURL(blobName: blobName)
-                    }
-                }
-            }
 
             Text(friendName)
                 .font(.system(size: 15))

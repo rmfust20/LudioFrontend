@@ -20,20 +20,23 @@ class BoardGameViewModel: ObservableObject {
     @Published var userRating : Int = 0
     @Published var userReview : ReviewModel? = nil
     @Published var userWinRate: WinRateResponse? = nil
+    @Published var reviewProfileImages: [Int: String] = [:]
     private let reviewService: ReviewService
     private let userService: UserService
+    private let imageService: ImageService
 
-    init(boardGameService: BoardGameService = BoardGameService(), reviewService: ReviewService = ReviewService(), userService: UserService = UserService(), boardGameID: Int) {
+    init(boardGameService: BoardGameService = BoardGameService(), reviewService: ReviewService = ReviewService(), userService: UserService = UserService(), imageService: ImageService = ImageService(), boardGameID: Int) {
         self.boardGameService = boardGameService
         self.reviewService = reviewService
         self.userService = userService
+        self.imageService = imageService
         self.boardGameID = boardGameID
         print(boardGameID)
     }
     
     @MainActor
-    func fetchBoardGame(_ boardGameID : Int) async -> BoardGameModel? {
-        let fetchedBoardGame = try? await boardGameService.fetchBoardGame(boardGameID: boardGameID)
+    func fetchBoardGame(_ boardGameID: Int, accessToken: String) async -> BoardGameModel? {
+        let fetchedBoardGame = try? await boardGameService.fetchBoardGame(boardGameID: boardGameID, accessToken: accessToken)
         if let fetchedBoardGame = fetchedBoardGame {
             return fetchedBoardGame
         }
@@ -62,7 +65,7 @@ class BoardGameViewModel: ObservableObject {
     func presentBoardGame(accessToken: String) async {
         let cachedBoardGame = BoardGameCache.shared.get(id: boardGameID)
         if cachedBoardGame == nil {
-            let networkBoardGame = await fetchBoardGame(boardGameID)
+            let networkBoardGame = await fetchBoardGame(boardGameID, accessToken: accessToken)
             if let networkBoardGame = networkBoardGame {
                 BoardGameCache.shared.set(networkBoardGame)
                 self.boardGame = networkBoardGame
@@ -74,30 +77,41 @@ class BoardGameViewModel: ObservableObject {
     }
     
     @MainActor
-    func getBoardGameDesigners() async -> [String] {
-        let designers = try? await boardGameService.fetchBoardGameDesigners(boardGameID)
+    func getBoardGameDesigners(accessToken: String) async -> [String] {
+        let designers = try? await boardGameService.fetchBoardGameDesigners(boardGameID, accessToken: accessToken)
         return designers ?? []
     }
-    
+
     @MainActor
-    func getReviews() async {
-        if let fetchedReviews = try? await reviewService.getReviews(boardGameID: boardGameID) {
-            reviews = fetchedReviews
+    func getReviews(accessToken: String) async {
+        guard let fetchedReviews = try? await reviewService.getReviews(boardGameID: boardGameID, accessToken: accessToken) else { return }
+        reviews = fetchedReviews
+
+        let userIDs = Array(Set(fetchedReviews.map { $0.user_id }))
+        let profiles = (try? await userService.getUsers(userIDs: userIDs, accessToken: accessToken)) ?? []
+
+        let blobEntries: [(Int, String)] = profiles.compactMap { p in
+            guard let blob = p.profile_image_url else { return nil }
+            return (p.id, blob)
+        }
+        let urls = (try? await imageService.getImageURLs(blobNames: blobEntries.map { $0.1 }, accessToken: accessToken)) ?? []
+        for (index, (userID, _)) in blobEntries.enumerated() where index < urls.count {
+            reviewProfileImages[userID] = urls[index]
         }
     }
-    
+
     @MainActor
-    func getReviewStats(boardGameID : Int) async {
-        if let stats = try? await reviewService.getReviewStats(boardGameID: boardGameID) {
+    func getReviewStats(boardGameID: Int, accessToken: String) async {
+        if let stats = try? await reviewService.getReviewStats(boardGameID: boardGameID, accessToken: accessToken) {
             averageRating = stats.average_rating
             numberOfRatings = stats.number_of_ratings
             numberOfReviews = stats.number_of_reviews
         }
     }
-    
+
     @MainActor
-    func getUserReview(userID: Int) async {
-        if let review = try? await reviewService.getUserReview(boardGameID: boardGameID, userID: userID) {
+    func getUserReview(userID: Int, accessToken: String) async {
+        if let review = try? await reviewService.getUserReview(boardGameID: boardGameID, userID: userID, accessToken: accessToken) {
             userRating = review.rating
             userReview = review
         }
@@ -112,7 +126,7 @@ class BoardGameViewModel: ObservableObject {
     }
 
     @MainActor
-    func getWinRateForGame(userID: Int) async {
-        userWinRate = try? await userService.getWinRateForGame(userID: userID, boardGameID: boardGameID)
+    func getWinRateForGame(userID: Int, accessToken: String) async {
+        userWinRate = try? await userService.getWinRateForGame(userID: userID, boardGameID: boardGameID, accessToken: accessToken)
     }
 }

@@ -62,10 +62,15 @@ struct ImageService {
         var components = URLComponents(string: baseURL)
         components?.path = "/images/upload"
         guard let url = components?.url else { throw APIError.invalidURL }
-        
+
+        print("[ImageUpload] uploading \(files.count) file(s) to \(url)")
+        for (i, file) in files.enumerated() {
+            print("[ImageUpload] file \(i + 1): \(file.filename), mime: \(file.mimeType), size: \(file.data.count) bytes")
+        }
+
         var request = URLRequest(url: url)
         try client.authorizedRequest(&request, accessToken: accessToken)
-        
+
         request.httpMethod = "POST"
 
         let boundary = "Boundary-\(UUID().uuidString)"
@@ -81,20 +86,26 @@ struct ImageService {
         request.httpBody = body
         request.setValue(String(body.count), forHTTPHeaderField: "Content-Length")
 
-        let (respData, response) = try await URLSession.shared.data(for: request)
+        let (respData, response) = try await client.data(for: request)
 
         guard let http = response as? HTTPURLResponse else {
+            print("[ImageUpload] error: no HTTP response")
             throw NSError(domain: "Upload", code: 0, userInfo: [NSLocalizedDescriptionKey: "No HTTP response"])
         }
 
+        print("[ImageUpload] response status: \(http.statusCode)")
+
         guard (200..<300).contains(http.statusCode) else {
             let text = String(data: respData, encoding: .utf8) ?? "<no body>"
+            print("[ImageUpload] error body: \(text)")
             throw NSError(domain: "Upload", code: http.statusCode, userInfo: [
                 NSLocalizedDescriptionKey: "Upload failed (\(http.statusCode)): \(text)"
             ])
         }
 
-        return try JSONDecoder().decode(UploadImagesResponse.self, from: respData)
+        let decoded = try JSONDecoder().decode(UploadImagesResponse.self, from: respData)
+        print("[ImageUpload] success — blob names: \(decoded.uploads.compactMap { $0.blob_name })")
+        return decoded
     }
     
     private func makeMultipartBody(
@@ -130,25 +141,31 @@ struct ImageService {
         return nil
     }
     
-    func getImageURL(blobName: String) async throws -> String {
+    func getImageURL(blobName: String, accessToken: String) async throws -> String {
         var components = URLComponents(string: baseURL)
         components?.path = "/images/url"
         components?.queryItems = [URLQueryItem(name: "blob_name", value: blobName)]
         guard let url = components?.url else { throw APIError.invalidURL }
 
-        let (data, _) = try await URLSession.shared.data(from: url)
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+
+        let (data, _) = try await client.data(for: request)
         let decoded = try JSONDecoder().decode([String: String].self, from: data)
         guard let urlString = decoded["url"] else { throw APIError.invalidURL }
         return urlString
     }
 
-    func getImageURLs(blobNames: [String]) async throws -> [String] {
+    func getImageURLs(blobNames: [String], accessToken: String) async throws -> [String] {
         var components = URLComponents(string: baseURL)
         components?.path = "/images/urls"
         components?.queryItems = blobNames.map { URLQueryItem(name: "blob_names", value: $0) }
         guard let url = components?.url else { throw APIError.invalidURL }
 
-        let (data, _) = try await URLSession.shared.data(from: url)
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+
+        let (data, _) = try await client.data(for: request)
         let decoded = try JSONDecoder().decode([String: [String]].self, from: data)
         return decoded["urls"] ?? []
     }

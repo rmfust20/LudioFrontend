@@ -16,6 +16,7 @@ struct ProfileView: View {
     @State private var showAccountOptions: Bool = false
     @State private var showLogoutConfirm: Bool = false
     @State private var showDeleteConfirm: Bool = false
+    @State private var isLoadingContent: Bool = true
     let userID: Int
     let username: String?
 
@@ -25,6 +26,7 @@ struct ProfileView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
+                    if userID == auth.userID {
                     Button {
                         showAccountOptions = true
                     } label: {
@@ -56,6 +58,7 @@ struct ProfileView: View {
                     } message: {
                         Text("This will permanently delete your account and all your data. This cannot be undone.")
                     }
+                    }
                     // Header
                     HStack(alignment: .center) {
                         Text(username ?? "Loading...")
@@ -65,18 +68,20 @@ struct ProfileView: View {
                         if userID != auth.userID{
                             if !profileViewModel.userFriends.contains(where: { $0.id == auth.userID ?? 0 }) && !profileViewModel.pendingFriends.contains(where: { $0.id == auth.userID ?? 0 })
                             {
-                                Button {
-                                    Task {
-                                        await profileViewModel.sendFriendRequest(userID: auth.userID ?? 0, friendID: userID, auth: auth)
+                                if !profileViewModel.sentFriendRequestIDs.contains(userID) {
+                                    Button {
+                                        Task {
+                                            await profileViewModel.sendFriendRequest(userID: auth.userID ?? 0, friendID: userID, auth: auth)
+                                        }
+                                    } label: {
+                                        Text("Add Friend")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 14)
+                                            .padding(.vertical, 8)
+                                            .background(Color("PrimaryButton"))
+                                            .clipShape(Capsule())
                                     }
-                                } label: {
-                                    Text("Add Friend")
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 8)
-                                        .background(Color("PrimaryButton"))
-                                        .clipShape(Capsule())
                                 }
                             }
                         }
@@ -91,8 +96,8 @@ struct ProfileView: View {
                             maxSelectionCount: 1,
                             matching: .images
                         ) {
-                            if profileViewModel.profileImageURL != nil {
-                                AsyncImage(url: URL(string: profileViewModel.profileImageURL!)) { image in
+                            if let profileImageURL = profileViewModel.profileImageURL {
+                                AsyncImage(url: URL(string: profileImageURL)) { image in
                                     image.resizable().scaledToFill()
                                 } placeholder: {
                                     ProgressView()
@@ -123,7 +128,7 @@ struct ProfileView: View {
                         } label: {
                             ProfileStatBadge(value: String(profileViewModel.userFriends.count), label: "Friends")
                                 .overlay(alignment: .topTrailing) {
-                                    if profileViewModel.userFriends.count == 0 {
+                                    if profileViewModel.userFriends.count == 0 && userID == auth.userID{
                                         Text("add")
                                             .font(.system(size: 9, weight: .bold))
                                             .foregroundStyle(.white)
@@ -142,7 +147,7 @@ struct ProfileView: View {
                         }
                         .buttonStyle(.plain)
 
-                        ProfileStatBadge(value: "50", label: "Games")
+                        ProfileStatBadge(value: String(profileViewModel.boardGames.count), label: "Games")
                     }
                     .padding(20)
                     .background(Color("CardSurface"))
@@ -158,7 +163,7 @@ struct ProfileView: View {
                                 .foregroundStyle(.white)
                             Spacer()
                             Button {
-                                router.push(.gameNightFeed(userOnly: true))
+                                router.push(.gameNightFeed(userOnly: userID))
                             } label: {
                                 Text("See All")
                                     .font(.system(size: 13, weight: .semibold))
@@ -186,38 +191,61 @@ struct ProfileView: View {
                         }
                         .padding(.horizontal, 20)
 
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            LazyHStack(spacing: 12) {
-                                ForEach(profileViewModel.boardGames) { boardGame in
-                                    Button {
-                                        router.push(.boardGame(id: boardGame.id))
-                                    } label: {
-                                        AsyncImage(url: URL(string: boardGame.image ?? "")) { image in
-                                            image.resizable().scaledToFill()
-                                        } placeholder: {
-                                            Rectangle()
-                                                .fill(Color.gray.opacity(0.12))
-                                                .overlay(
-                                                    ProgressView()
-                                                )
+                        if profileViewModel.boardGames.isEmpty && !isLoadingContent {
+                            VStack(spacing: 10) {
+                                Image(systemName: "gamecontroller.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(Color("MutedText"))
+                                Text("No games yet")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                Text("Games from your game nights and reviews will appear here")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Color("MutedText"))
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 32)
+                            .padding(.horizontal, 16)
+                            .background(Color("CardSurface"))
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .padding(.horizontal, 16)
+                        } else {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                LazyHStack(spacing: 12) {
+                                    ForEach(profileViewModel.boardGames) { boardGame in
+                                        Button {
+                                            router.push(.boardGame(id: boardGame.id))
+                                        } label: {
+                                            AsyncImage(url: URL(string: boardGame.image ?? "")) { image in
+                                                image.resizable().scaledToFill()
+                                            } placeholder: {
+                                                Rectangle()
+                                                    .fill(Color.gray.opacity(0.12))
+                                                    .overlay(
+                                                        ProgressView()
+                                                    )
+                                            }
+                                            .frame(width: 130, height: 180)
+                                            .clipped()
+                                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                         }
-                                        .frame(width: 130, height: 180)
-                                        .clipped()
-                                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                     }
                                 }
+                                .padding(.horizontal, 16)
                             }
-                            .padding(.horizontal, 16)
                         }
-                        .onAppear {
+                    }
+                    .padding(.bottom, 32)
+                    .onAppear {
                             Task {
-                                await profileViewModel.getUserFriends(userID: userID)
+                                await profileViewModel.getUserFriends(userID: userID, accessToken: auth.accessToken ?? "")
                                 async let pendingFriends: () = profileViewModel.getUserFriendsPending(userID: auth.userID ?? 0, auth: auth)
                                 await pendingFriends
-                                async let boardGames: () = profileViewModel.fetchUserBoardGames(userID: userID)
-                                async let gameNights: () = profileViewModel.fetchUserGameNights(userID: userID)
-                                async let userProfile: () = profileViewModel.fetchUserProfile(auth: auth)
-                                async let winRate: () = profileViewModel.fetchWinRate(userID: userID)
+                                async let boardGames: () = profileViewModel.fetchUserBoardGames(userID: userID, accessToken: auth.accessToken ?? "")
+                                async let gameNights: () = profileViewModel.fetchUserGameNights(userID: userID, accessToken: auth.accessToken ?? "")
+                                async let userProfile: () = profileViewModel.fetchUserProfile(userID: userID, auth: auth)
+                                async let winRate: () = profileViewModel.fetchWinRate(userID: userID, accessToken: auth.accessToken ?? "")
                                 await userProfile
                                 await boardGames
                                 await gameNights
@@ -227,18 +255,31 @@ struct ProfileView: View {
                                         let id = gameNight.id
                                         let blobNames = gameNight.images ?? []
                                         group.addTask {
-                                            await profileViewModel.fetchImageURLFromBlob(id: id, blobNames: blobNames)
+                                            await profileViewModel.fetchImageURLFromBlob(id: id, blobNames: blobNames, accessToken: auth.accessToken ?? "")
                                         }
                                     }
                                 }
+                                isLoadingContent = false
                             }
                         }
-                    }
-                    .padding(.bottom, 32)
                 }
             }
             .fullScreenCover(isPresented: $addFriendsPresented) {
                 FriendsSheet(profileViewModel: profileViewModel, isPresented: $addFriendsPresented, userID: userID)
+            }
+            .overlay {
+                if isLoadingContent {
+                    Color("CharcoalBackground").ignoresSafeArea()
+                    ProgressView().tint(.white)
+                }
+            }
+            .alert("Error", isPresented: Binding(
+                get: { profileViewModel.errorMessage != nil },
+                set: { if !$0 { profileViewModel.errorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(profileViewModel.errorMessage ?? "")
             }
         }
     }
@@ -258,7 +299,7 @@ struct ProfileView: View {
                 gameNightImageTile(nights[1])
             }
         case 3:
-            VStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 10) {
                     gameNightImageTile(nights[0])
                     gameNightImageTile(nights[1])
@@ -282,7 +323,24 @@ struct ProfileView: View {
                 }
             }
         default:
-            EmptyView()
+            if !isLoadingContent {
+                VStack(spacing: 10) {
+                    Image(systemName: "dice.fill")
+                        .font(.system(size: 32))
+                        .foregroundStyle(Color("MutedText"))
+                    Text("No game nights yet")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("Post your first game night to get started")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color("MutedText"))
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 32)
+                .background(Color("CardSurface"))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
         }
     }
 
@@ -341,12 +399,10 @@ private struct ProfileStatBadge: View {
 
 private struct PendingFriendRow: View {
     let friend: UserPublicModel
+    let profileImageURL: String?
     let onTap: () -> Void
     let onAccept: () -> Void
     let onDecline: () -> Void
-    @State private var profileImageURL: String? = nil
-    private let userService = UserService()
-    private let imageService = ImageService()
 
     var body: some View {
         HStack(spacing: 14) {
@@ -393,13 +449,6 @@ private struct PendingFriendRow: View {
                     .foregroundStyle(Color("MutedText"))
             }
         }
-        .onAppear {
-            Task {
-                if let blobName = (try? await userService.getUser(userID: friend.id))?.profile_image_url {
-                    profileImageURL = try? await imageService.getImageURL(blobName: blobName)
-                }
-            }
-        }
     }
 }
 
@@ -438,11 +487,14 @@ struct FriendsSheet: View {
                 .padding(.bottom, 16)
 
                 HStack(spacing: 0) {
-                    ForEach([
-                        (0, "Friends"),
-                        (1, profileViewModel.pendingFriends.isEmpty ? "Incoming" : "Incoming (\(profileViewModel.pendingFriends.count))"),
-                        (2, "Add")
-                    ], id: \.0) { tab, label in
+                    let tabs: [(Int, String)] = userID == auth.userID
+                        ? [
+                            (0, "Friends"),
+                            (1, profileViewModel.pendingFriends.isEmpty ? "Incoming" : "Incoming (\(profileViewModel.pendingFriends.count))"),
+                            (2, "Add")
+                          ]
+                        : [(0, "Friends")]
+                    ForEach(tabs, id: \.0) { tab, label in
                         Button {
                             selectedTab = tab
                         } label: {
@@ -485,7 +537,7 @@ struct FriendsSheet: View {
                     ScrollView(showsIndicators: false) {
                         LazyVStack(spacing: 12) {
                             ForEach(profileViewModel.filteredFriends) { friend in
-                                TagFriendRow(friend: friend) {
+                                TagFriendRow(friend: friend, profileImageURL: profileViewModel.friendProfileImages[friend.id]) {
                                     router.push(.profile(id: friend.id, username: friend.username))
                                     isPresented.toggle()
                                 }
@@ -500,6 +552,7 @@ struct FriendsSheet: View {
                             ForEach(profileViewModel.pendingFriends) { friend in
                                 PendingFriendRow(
                                     friend: friend,
+                                    profileImageURL: profileViewModel.pendingFriendProfileImages[friend.id],
                                     onTap: {
                                         router.push(.profile(id: friend.id, username: friend.username))
                                         isPresented.toggle()
@@ -534,7 +587,7 @@ struct FriendsSheet: View {
                             .autocapitalization(.none)
                             .onChange(of: findSearchText) {
                                 Task {
-                                    await profileViewModel.searchUsers(query: findSearchText)
+                                    await profileViewModel.searchUsers(query: findSearchText, accessToken: auth.accessToken ?? "")
                                 }
                             }
                     }
@@ -553,7 +606,8 @@ struct FriendsSheet: View {
                             }) { user in
                                 FindUserRow(
                                     user: user,
-                                    requestSent: profileViewModel.sentFriendRequestIDs.contains(user.id)
+                                    requestSent: profileViewModel.sentFriendRequestIDs.contains(user.id),
+                                    profileImageURL: profileViewModel.searchResultProfileImages[user.id]
                                 ) {
                                     Task {
                                         await profileViewModel.sendFriendRequest(userID: auth.userID ?? 0, friendID: user.id, auth: auth)
@@ -567,9 +621,17 @@ struct FriendsSheet: View {
                 }
             }
         }
+        .alert("Error", isPresented: Binding(
+            get: { profileViewModel.errorMessage != nil },
+            set: { if !$0 { profileViewModel.errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(profileViewModel.errorMessage ?? "")
+        }
         .onAppear {
             Task {
-                async let friends: () = profileViewModel.getUserFriends(userID: userID)
+                async let friends: () = profileViewModel.getUserFriends(userID: userID, accessToken: auth.accessToken ?? "")
                 async let sentRequests: () = profileViewModel.loadSentFriendRequests(auth: auth)
                 await friends
                 await sentRequests
@@ -582,10 +644,8 @@ struct FriendsSheet: View {
 
 private struct TagFriendRow: View {
     let friend: UserPublicModel
+    let profileImageURL: String?
     let onTap: () -> Void
-    @State private var profileImageURL: String? = nil
-    private let userService = UserService()
-    private let imageService = ImageService()
 
     var body: some View {
         Button {
@@ -620,13 +680,6 @@ private struct TagFriendRow: View {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
-        .onAppear {
-            Task {
-                if let blobName = (try? await userService.getUser(userID: friend.id))?.profile_image_url {
-                    profileImageURL = try? await imageService.getImageURL(blobName: blobName)
-                }
-            }
-        }
     }
 }
 
@@ -635,10 +688,8 @@ private struct TagFriendRow: View {
 private struct FindUserRow: View {
     let user: UserPublicModel
     let requestSent: Bool
+    let profileImageURL: String?
     let onAdd: () -> Void
-    @State private var profileImageURL: String? = nil
-    private let userService = UserService()
-    private let imageService = ImageService()
 
     var body: some View {
         HStack(spacing: 14) {
@@ -678,13 +729,6 @@ private struct FindUserRow: View {
         .padding(14)
         .background(Color("CardSurface"))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .onAppear {
-            Task {
-                if let blobName = (try? await userService.getUser(userID: user.id))?.profile_image_url {
-                    profileImageURL = try? await imageService.getImageURL(blobName: blobName)
-                }
-            }
-        }
     }
 }
 

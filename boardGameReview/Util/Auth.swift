@@ -26,6 +26,7 @@ final class Auth: ObservableObject {
 
     func setSession(_ auth: AuthResponse) {
         accessToken  = auth.access_token
+        print("Access Token: \(auth.access_token)")
         refreshToken = auth.refresh_token
         tokenType    = auth.token_type
         username     = auth.user.username

@@ -9,6 +9,7 @@ import SwiftUI
 import UIKit
 
 struct SearchView: View {
+    @EnvironmentObject var auth: Auth
     @Binding var isPresented: Bool
     @Binding var selectedBoardGameID : Int?
     @State private var searchText: String = ""
@@ -43,7 +44,7 @@ struct SearchView: View {
                         TextField("", text: $searchText, prompt: Text("Board Game Name").foregroundStyle(Color("MutedText")))
                             .foregroundStyle(.white)
                             .onChange(of: searchText) {
-                                searchViewModel.performSearch(searchText: searchText)
+                                searchViewModel.performSearch(searchText: searchText, accessToken: auth.accessToken ?? "")
                             }
                     }
                     .padding(.horizontal, 14)

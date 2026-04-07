@@ -29,21 +29,18 @@ struct BottomNavBarView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-
-                AppNavRouter(selectedTab: $selectedTab) { HomeView() }
-                .tabItem { Label("Home", systemImage: "house") }
-                .tag(Tab.home)
-
+            
+            AppNavRouter(selectedTab: $selectedTab) { GameNightFeedView(userOnly: nil) }
+                .tabItem { Label("Game", systemImage: "envelope.front.fill") }
+                .tag(Tab.game)
+            
+            AppNavRouter(selectedTab: $selectedTab) { HomeView() }
+            .tabItem { Label("Home", systemImage: "house") }
+            .tag(Tab.home)
+            
             AppNavRouter(selectedTab: $selectedTab) { ProfileView(userID: auth.userID ?? 0, username: auth.username) }
                     .tabItem { Label("Profile", systemImage: "person") }
                     .tag(Tab.profile)
-            AppNavRouter(selectedTab: $selectedTab) { RegisterView() }
-                .tabItem { Label("Login", systemImage: "square.and.arrow.up") }
-                .tag(Tab.login)
-            
-            AppNavRouter(selectedTab: $selectedTab) { GameNightFeedView(userOnly: false) }
-                .tabItem { Label("Game", systemImage: "calendar") }
-                .tag(Tab.game)
                 
         }
         .tint(.black)

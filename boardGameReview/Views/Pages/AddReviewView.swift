@@ -14,6 +14,7 @@ struct AddReviewView: View {
     @State var rating: Int
     @State private var text: String
     @State private var existingReview: ReviewModel?
+    @State private var saveError: String?
     @StateObject private var reviewViewModel = ReviewViewModel()
 
     init(boardGameID: Int, rating: Int, review: ReviewModel?) {
@@ -77,22 +78,30 @@ struct AddReviewView: View {
         .onAppear {
             Task {
                 if let fetched = try? await reviewViewModel.reviewService.getUserReview(
-                    boardGameID: boardGameID, userID: auth.userID ?? 0
+                    boardGameID: boardGameID, userID: auth.userID ?? 0, accessToken: auth.accessToken ?? ""
                 ) {
                     existingReview = fetched
                     if text.isEmpty { text = fetched.comment ?? "" }
                 }
             }
         }
+        .alert("Error", isPresented: Binding(
+            get: { saveError != nil },
+            set: { if !$0 { saveError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(saveError ?? "")
+        }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(existingReview != nil ? "Save" : "Post") {
                     Task {
                         do {
-                            if let existing = existingReview {
+                            if let existing = existingReview, let reviewID = existing.id {
                                 try await reviewViewModel.updateReview(
-                                    reviewID: existing.id!,
-                                    review: ReviewUpdate(id: existing.id!, rating: rating, comment: text),
+                                    reviewID: reviewID,
+                                    review: ReviewUpdate(id: reviewID, rating: rating, comment: text),
                                     accessToken: auth.accessToken ?? ""
                                 )
                             } else {
@@ -108,7 +117,7 @@ struct AddReviewView: View {
                             }
                             router.pop()
                         } catch {
-                            print("Error saving review: \(error)")
+                            saveError = "Failed to save your review. Please try again."
                         }
                     }
                 }

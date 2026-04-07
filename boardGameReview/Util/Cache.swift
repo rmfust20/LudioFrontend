@@ -32,6 +32,8 @@ final class BoardGameCache {
     }
 }
 
+
+
 final class ImageCache {
     private let cache = SDImageCache()
     static let shared = ImageCache()

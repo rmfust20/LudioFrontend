@@ -71,6 +71,14 @@ class UserViewModel: ObservableObject {
         return true
     }
 
+    func forgotPassword(email: String) async -> Bool {
+        (try? await userService.forgotPassword(email: email)) != nil
+    }
+
+    func resetPassword(token: String, newPassword: String) async -> Bool {
+        (try? await userService.resetPassword(token: token, newPassword: newPassword)) != nil
+    }
+
     @MainActor
     func populateAuth(auth: AuthResponse, authStore: Auth) {
         authStore.setSession(auth)

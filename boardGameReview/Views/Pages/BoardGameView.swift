@@ -18,6 +18,7 @@ struct BoardGameView: View {
     @State private var showDeleteConfirmation = false
     @State private var isNavigatingToAddReview = false
     @State private var isDescriptionExpanded = false
+    @State private var isLoading = true
     @StateObject private var boardGameViewModel: BoardGameViewModel
     @StateObject private var reviewViewModel = ReviewViewModel()
 
@@ -69,9 +70,10 @@ struct BoardGameView: View {
                             await boardGameViewModel.presentImage()
                             boardGame = boardGameViewModel.boardGame
                             cardImage = boardGameViewModel.boardGameImage
-                            await boardGameViewModel.getReviews()
-                            await boardGameViewModel.getUserReview(userID: auth.userID ?? 0)
-                            await boardGameViewModel.getWinRateForGame(userID: auth.userID ?? 0)
+                            isLoading = false
+                            await boardGameViewModel.getReviews(accessToken: auth.accessToken ?? "")
+                            await boardGameViewModel.getUserReview(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "")
+                            await boardGameViewModel.getWinRateForGame(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "")
                         }
                     }
 
@@ -86,7 +88,7 @@ struct BoardGameView: View {
                             .foregroundStyle(Color("MutedText"))
                             .onAppear {
                                 Task {
-                                    designers = await boardGameViewModel.getBoardGameDesigners()
+                                    designers = await boardGameViewModel.getBoardGameDesigners(accessToken: auth.accessToken ?? "")
                                 }
                             }
                     }
@@ -129,7 +131,7 @@ struct BoardGameView: View {
                     .padding(.top, 14)
                     .onAppear {
                         Task {
-                            await boardGameViewModel.getReviewStats(boardGameID: boardGameID)
+                            await boardGameViewModel.getReviewStats(boardGameID: boardGameID, accessToken: auth.accessToken ?? "")
                         }
                     }
 
@@ -196,8 +198,8 @@ struct BoardGameView: View {
                         .confirmationDialog("Are you sure you want to delete your review?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
                             Button("Delete", role: .destructive) {
                                 Task {
-                                    if let review = boardGameViewModel.userReview {
-                                        try? await boardGameViewModel.deleteReview(reviewID: review.id!, accessToken: auth.accessToken ?? "")
+                                    if let review = boardGameViewModel.userReview, let reviewID = review.id {
+                                        try? await boardGameViewModel.deleteReview(reviewID: reviewID, accessToken: auth.accessToken ?? "")
                                         boardGameViewModel.userReview = nil
                                         boardGameViewModel.userRating = 0
                                     }
@@ -227,7 +229,7 @@ struct BoardGameView: View {
                                 Button {
                                     router.push(.profile(id: review.user_id, username: review.username))
                                 } label: {
-                                    ReviewCardView(reviewModel: review)
+                                    ReviewCardView(reviewModel: review, profileImageURL: boardGameViewModel.reviewProfileImages[review.user_id])
                                         .padding(.horizontal, 20)
                                 }
                                 .buttonStyle(.plain)
@@ -242,6 +244,12 @@ struct BoardGameView: View {
                     Spacer(minLength: 40)
                 }
                 .frame(maxWidth: .infinity)
+            }
+        }
+        .overlay {
+            if isLoading {
+                Color("CharcoalBackground").ignoresSafeArea()
+                ProgressView().tint(.white)
             }
         }
         .edgesIgnoringSafeArea(.top)

@@ -12,7 +12,7 @@ struct RegisterView: View {
     @EnvironmentObject var auth: Auth
     @EnvironmentObject var userViewModel: UserViewModel
 
-    private enum AuthMode { case signUp, logIn }
+    private enum AuthMode { case signUp, logIn, forgotPassword, resetPassword }
     private enum SignUpStep { case credentials, username }
 
     @State private var mode: AuthMode = .signUp
@@ -30,6 +30,14 @@ struct RegisterView: View {
     // Apple Sign In (pending username completion)
     @State private var pendingAppleID: String? = nil
     @State private var pendingAppleEmail: String? = nil
+
+    // Forgot / Reset Password
+    @State private var forgotEmail: String = ""
+    @State private var forgotPasswordSent: Bool = false
+    @State private var resetToken: String? = nil
+    @State private var newPassword: String = ""
+    @State private var confirmPassword: String = ""
+    @State private var resetSuccess: Bool = false
 
     @State private var isLoading: Bool = false
     @State private var errorMessage: String? = nil
@@ -62,6 +70,9 @@ struct RegisterView: View {
                     .padding(.top, 60)
 
                     // MARK: Mode Picker
+                    if mode == .forgotPassword || mode == .resetPassword {
+                        EmptyView()
+                    } else {
                     HStack(spacing: 0) {
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) {
@@ -100,6 +111,7 @@ struct RegisterView: View {
                     .background(Color("CardSurface"))
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .padding(.horizontal, 20)
+                    } // end mode picker visibility
 
                     // MARK: Form Content
                     if mode == .signUp {
@@ -108,13 +120,29 @@ struct RegisterView: View {
                         } else {
                             usernameStep
                         }
-                    } else {
+                    } else if mode == .logIn {
                         logInForm
+                    } else if mode == .forgotPassword {
+                        forgotPasswordForm
+                    } else {
+                        resetPasswordForm
                     }
 
                     Spacer(minLength: 40)
                 }
             }
+        }
+        .onOpenURL { url in
+            guard url.scheme == "tabulus",
+                  url.host == "resetPassword",
+                  let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                  let token = components.queryItems?.first(where: { $0.name == "token" })?.value
+            else { return }
+            resetToken = token
+            newPassword = ""
+            confirmPassword = ""
+            errorMessage = nil
+            withAnimation(.easeInOut(duration: 0.2)) { mode = .resetPassword }
         }
     }
 
@@ -352,9 +380,182 @@ struct RegisterView: View {
             .buttonStyle(.plain)
             .disabled(isLoading)
 
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    mode = .forgotPassword
+                    errorMessage = nil
+                    forgotEmail = ""
+                    forgotPasswordSent = false
+                }
+            } label: {
+                Text("Forgot password?")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color("MutedText"))
+            }
+            .buttonStyle(.plain)
+
             appleSignInDivider
 
             appleButton
+        }
+        .padding(.horizontal, 20)
+    }
+
+    // MARK: - Forgot Password Form
+
+    private var forgotPasswordForm: some View {
+        VStack(spacing: 20) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Reset password")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(.white)
+                Text("Enter your email and we'll send you a reset link")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color("MutedText"))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if forgotPasswordSent {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 13))
+                    Text("Check your email for a reset link")
+                        .font(.system(size: 13))
+                }
+                .foregroundStyle(Color.green.opacity(0.85))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Email")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color("MutedText"))
+                    TextField("", text: $forgotEmail)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .textContentType(.emailAddress)
+                        .foregroundStyle(.white)
+                        .tint(Color("PrimaryButton"))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .background(Color("CardSurface"))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(forgotEmail.isEmpty ? Color.clear : Color("PrimaryButton").opacity(0.3), lineWidth: 1)
+                        )
+                }
+
+                errorBanner
+
+                Button {
+                    Task { await sendForgotPassword() }
+                } label: {
+                    ZStack {
+                        Text("Send Reset Link")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .opacity(isLoading ? 0 : 1)
+                        if isLoading { ProgressView().tint(.white) }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color("PrimaryButton"))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(isLoading)
+            }
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    mode = .logIn
+                    errorMessage = nil
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12, weight: .medium))
+                    Text("Back to log in")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .foregroundStyle(Color("MutedText"))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 20)
+    }
+
+    // MARK: - Reset Password Form
+
+    private var resetPasswordForm: some View {
+        VStack(spacing: 20) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Choose a new password")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(.white)
+                Text("Enter a new password for your account")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color("MutedText"))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("New Password")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color("MutedText"))
+                    SecureField("", text: $newPassword)
+                        .textContentType(.newPassword)
+                        .foregroundStyle(.white)
+                        .tint(Color("PrimaryButton"))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .background(Color("CardSurface"))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(newPassword.isEmpty ? Color.clear : Color("PrimaryButton").opacity(0.3), lineWidth: 1)
+                        )
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Confirm Password")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color("MutedText"))
+                    SecureField("", text: $confirmPassword)
+                        .textContentType(.newPassword)
+                        .foregroundStyle(.white)
+                        .tint(Color("PrimaryButton"))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .background(Color("CardSurface"))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(confirmPassword.isEmpty ? Color.clear : Color("PrimaryButton").opacity(0.3), lineWidth: 1)
+                        )
+                }
+            }
+
+            errorBanner
+
+            Button {
+                Task { await submitResetPassword() }
+            } label: {
+                ZStack {
+                    Text("Reset Password")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .opacity(isLoading ? 0 : 1)
+                    if isLoading { ProgressView().tint(.white) }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(Color("PrimaryButton"))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(isLoading)
         }
         .padding(.horizontal, 20)
     }
@@ -433,6 +634,47 @@ struct RegisterView: View {
             return
         }
         withAnimation(.easeInOut(duration: 0.2)) { signUpStep = .username }
+    }
+
+    private func sendForgotPassword() async {
+        errorMessage = nil
+        let trimmed = forgotEmail.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, trimmed.contains("@"), trimmed.contains(".") else {
+            errorMessage = "Please enter a valid email address."
+            return
+        }
+        isLoading = true
+        defer { isLoading = false }
+        _ = await userViewModel.forgotPassword(email: trimmed)
+        // Always show success — backend never reveals if email exists
+        withAnimation(.easeInOut(duration: 0.2)) { forgotPasswordSent = true }
+    }
+
+    private func submitResetPassword() async {
+        errorMessage = nil
+        guard newPassword.count >= 8 else {
+            errorMessage = "Password must be at least 8 characters."
+            return
+        }
+        guard newPassword == confirmPassword else {
+            errorMessage = "Passwords do not match."
+            return
+        }
+        guard let token = resetToken else {
+            errorMessage = "Invalid reset link."
+            return
+        }
+        isLoading = true
+        defer { isLoading = false }
+        let success = await userViewModel.resetPassword(token: token, newPassword: newPassword)
+        if success {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                mode = .logIn
+                errorMessage = nil
+            }
+        } else {
+            errorMessage = "Reset link is invalid or has expired."
+        }
     }
 
     private func loginUser() async {

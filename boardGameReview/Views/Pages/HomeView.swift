@@ -14,6 +14,7 @@ struct HomeView: View {
     @ObservedObject var reviewViewModel = ReviewViewModel()
     @State private var isSearchPresented: Bool = false
     @State private var selectedBoardGameID: Int? = nil
+    @State private var isLoading = true
 
     var body: some View {
         ZStack {
@@ -46,16 +47,31 @@ struct HomeView: View {
                             } label: {
                                 FeedCard(boardGame: boardGame)
                             }
-                            //.buttonStyle(.plain)
+                        }
+                        if !isLoading {
+                            Color.clear
+                                .frame(height: 1)
+                                .onAppear {
+                                    Task {
+                                        await homeFeedViewModel.loadMore(accessToken: auth.accessToken ?? "")
+                                    }
+                                }
+                            if homeFeedViewModel.isFetchingMore {
+                                ProgressView().tint(.white).padding(.vertical, 8)
+                            }
                         }
                     }
                 }
             }
-            .onAppear {
-                Task {
-                    await homeFeedViewModel.tempGetBoardGameFeed(
-                        accessToken: auth.accessToken ?? ""
-                    )
+            .task {
+                guard homeFeedViewModel.boardGames.isEmpty else { return }
+                await homeFeedViewModel.tempGetBoardGameFeed(accessToken: auth.accessToken ?? "")
+                isLoading = false
+            }
+            .overlay {
+                if isLoading {
+                    Color("CharcoalBackground").ignoresSafeArea()
+                    ProgressView().tint(.white)
                 }
             }
             .fullScreenCover(isPresented: $isSearchPresented) {

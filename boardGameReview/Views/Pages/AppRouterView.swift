@@ -13,7 +13,7 @@ enum AppRoute: Hashable {
     case boardGameDetail(id: Int)
     case addGameNight(id: Int)
     case profile(id: Int, username: String)
-    case gameNightFeed(userOnly: Bool)
+    case gameNightFeed(userOnly : Int?)
     case gameNight(id: Int)
 }
 

@@ -8,6 +8,7 @@ import SwiftUI
 
 final class AppRouter: ObservableObject {
     @Published var path = NavigationPath()
+    @Published var gameNightPosted: Bool = false
 
     func push(_ route: AppRoute) { path.append(route) }
     func pop() { if !path.isEmpty { path.removeLast() } }

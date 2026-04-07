@@ -9,7 +9,9 @@ import SwiftUI
 
 struct GameNightDetailView: View {
     let gameNightID: Int
+    @EnvironmentObject private var auth: Auth
     @StateObject private var viewModel = GameNightDetailViewModel()
+    @State private var isLoading = true
 
     var body: some View {
         ZStack {
@@ -27,33 +29,29 @@ struct GameNightDetailView: View {
                     .padding(.top, 20)
                     .padding(.bottom, 20)
 
-                    if let gameNight = viewModel.gameNight {
-                        GameNightCardView(
-                            gameNight: gameNight,
-                            boardGames: viewModel.boardGames
-                                .filter { gameNight.sessions.map { $0.board_game_id }.contains($0.key) }
-                                .map { ($0.key, $0.value) }
-                        )
-                        .padding(.horizontal, 16)
-                    } else {
-                        ProgressView()
-                            .tint(.white)
-                            .padding(.top, 60)
+                    if let feedModel = viewModel.feedModel {
+                        GameNightCardView(gameNight: feedModel)
+                            .padding(.horizontal, 16)
                     }
                 }
                 .padding(.bottom, 32)
             }
         }
-        .onAppear {
-            Task {
-                await viewModel.fetchGameNight(id: gameNightID)
-                await viewModel.fetchBoardGameDetails()
+        .overlay {
+            if isLoading {
+                Color("CharcoalBackground").ignoresSafeArea()
+                ProgressView().tint(.white)
             }
+        }
+        .task {
+            await viewModel.fetchGameNight(id: gameNightID, accessToken: auth.accessToken ?? "")
+            isLoading = false
         }
     }
 }
 
 #Preview {
     GameNightDetailView(gameNightID: 1)
+        .environmentObject(Auth())
         .environmentObject(AppRouter())
 }

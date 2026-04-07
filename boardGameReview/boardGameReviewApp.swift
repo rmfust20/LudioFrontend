@@ -22,14 +22,17 @@ struct boardGameReviewApp: App {
                         Color("CharcoalBackground").ignoresSafeArea()
                         ProgressView().tint(.white)
                     }
-                } else {
+                } else if auth.accessToken != nil {
                     BottomNavBarView()
+                } else {
+                    RegisterView()
                 }
             }
             .environmentObject(auth)
             .environmentObject(userViewModel)
             .environmentObject(appRouter)
             .task {
+                APIClient.shared.auth = auth
                 await restoreSession()
                 isRestoringSession = false
             }

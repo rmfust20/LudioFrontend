@@ -27,11 +27,12 @@ struct UserService {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
+        
         let encoder = JSONEncoder()
         let data = try encoder.encode(user)
         request.httpBody = data
         
-        let (responseData, response) = try await client.getSession().data(for: request)
+        let (responseData, response) = try await client.data(for: request)
         
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
@@ -54,7 +55,7 @@ struct UserService {
         let data = try encoder.encode(loginData)
         request.httpBody = data
         
-        let (responseData, response) = try await client.getSession().data(for: request)
+        let (responseData, response) = try await client.data(for: request)
         
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
@@ -63,7 +64,6 @@ struct UserService {
     }
     
     func updateUser(updatedUser: UserProfileModel, accessToken: String) async throws -> UserProfileModel {
-        print("starting updated")
         var components = URLComponents(string: baseURL)
         components?.path = "/users/updateUser"
         guard let url = components?.url else { throw APIError.invalidURL }
@@ -78,30 +78,41 @@ struct UserService {
         let data = try encoder.encode(updatedUser)
         request.httpBody = data
         
-        print("this farrrr")
-        let (responseData, response) = try await client.getSession().data(for: request)
-        print("her?")
+        let (responseData, response) = try await client.data(for: request)
         
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
         
         let updated = try JSONDecoder().decode(UserProfileModel.self, from: responseData)
-        print(updated)
         return updated
     }
     
-    func getUser(userID: Int) async throws -> UserProfileModel {
+    func getUsers(userIDs: [Int], accessToken: String) async throws -> [UserProfileModel] {
+        var components = URLComponents(string: baseURL)
+        components?.path = "/users/userProfiles"
+        components?.queryItems = userIDs.map { URLQueryItem(name: "user_ids", value: "\($0)") }
+        guard let url = components?.url else { throw APIError.invalidURL }
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+        
+
+        let (data, response) = try await client.data(for: request)
+
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
+        return try JSONDecoder().decode([UserProfileModel].self, from: data)
+    }
+
+    func getUser(userID: Int, accessToken: String) async throws -> UserProfileModel {
         var components = URLComponents(string: baseURL)
         components?.path = "/users/userProfile/\(userID)"
         guard let url = components?.url else { throw APIError.invalidURL }
         
         var request = URLRequest(url: url)
-        //try client.authorizedRequest(&request, accessToken: accessToken)
+        try client.authorizedRequest(&request, accessToken: accessToken)
         
         // ✅ Use the request, not the raw url
-        let (data, response) = try await client.getSession().data(for: request)
-        
-        print("did i get here?")
+        let (data, response) = try await client.data(for: request)
         
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
@@ -116,12 +127,10 @@ struct UserService {
         guard let url = components?.url else { throw APIError.invalidURL }
         
         var request = URLRequest(url: url)
-        //try client.authorizedRequest(&request, accessToken: accessToken)
+        try client.authorizedRequest(&request, accessToken: accessToken)
         
         // ✅ Use the request, not the raw url
-        let (data, response) = try await client.getSession().data(for: request)
-        
-        print("did i get here?")
+        let (data, response) = try await client.data(for: request)
         
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
@@ -139,7 +148,7 @@ struct UserService {
         try client.authorizedRequest(&request, accessToken: accessToken)
         request.httpMethod = "POST"
         
-        let (_, response) = try await client.getSession().data(for: request)
+        let (_, response) = try await client.data(for: request)
         
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
@@ -154,7 +163,7 @@ struct UserService {
         try client.authorizedRequest(&request, accessToken: accessToken)
         request.httpMethod = "DELETE"
 
-        let (_, response) = try await client.getSession().data(for: request)
+        let (_, response) = try await client.data(for: request)
 
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
@@ -169,7 +178,7 @@ struct UserService {
         try client.authorizedRequest(&request, accessToken: accessToken)
         request.httpMethod = "POST"
 
-        let (_, response) = try await client.getSession().data(for: request)
+        let (_, response) = try await client.data(for: request)
 
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
@@ -184,7 +193,7 @@ struct UserService {
         try client.authorizedRequest(&request, accessToken: accessToken)
         request.httpMethod = "POST"
 
-        let (_, response) = try await client.getSession().data(for: request)
+        let (_, response) = try await client.data(for: request)
 
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
@@ -198,7 +207,7 @@ struct UserService {
         var request = URLRequest(url: url)
         try client.authorizedRequest(&request, accessToken: accessToken)
 
-        let (data, response) = try await client.getSession().data(for: request)
+        let (data, response) = try await client.data(for: request)
 
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
@@ -206,15 +215,16 @@ struct UserService {
         return try JSONDecoder().decode([UserPublicModel].self, from: data)
     }
 
-    func searchUsers(username: String) async throws -> [UserPublicModel] {
+    func searchUsers(username: String, accessToken: String) async throws -> [UserPublicModel] {
         var components = URLComponents(string: baseURL)
         components?.path = "/users/search"
         components?.queryItems = [URLQueryItem(name: "username", value: username)]
         guard let url = components?.url else { throw APIError.invalidURL }
 
         var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
 
-        let (data, response) = try await client.getSession().data(for: request)
+        let (data, response) = try await client.data(for: request)
 
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
@@ -222,16 +232,17 @@ struct UserService {
         return try JSONDecoder().decode([UserPublicModel].self, from: data)
     }
 
-    func logout(refreshToken: String) async throws {
+    func logout(refreshToken: String, accessToken:String) async throws {
         var components = URLComponents(string: baseURL)
         components?.path = "/users/logout"
         components?.queryItems = [URLQueryItem(name: "refresh_token", value: refreshToken)]
         guard let url = components?.url else { throw APIError.invalidURL }
 
         var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
         request.httpMethod = "POST"
 
-        let (_, response) = try await client.getSession().data(for: request)
+        let (_, response) = try await client.data(for: request)
 
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
@@ -247,20 +258,21 @@ struct UserService {
 
         request.httpMethod = "DELETE"
 
-        let (_, response) = try await client.getSession().data(for: request)
+        let (_, response) = try await client.data(for: request)
 
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
     }
 
-    func getWinRate(userID: Int) async throws -> WinRateResponse {
+    func getWinRate(userID: Int, accessToken:String) async throws -> WinRateResponse {
         var components = URLComponents(string: baseURL)
         components?.path = "/users/winRate/\(userID)"
         guard let url = components?.url else { throw APIError.invalidURL }
 
         var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
 
-        let (data, response) = try await client.getSession().data(for: request)
+        let (data, response) = try await client.data(for: request)
 
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
@@ -277,7 +289,7 @@ struct UserService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
 
-        let (data, response) = try await client.getSession().data(for: request)
+        let (data, response) = try await client.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
 
@@ -294,7 +306,7 @@ struct UserService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(["identity_token": identityToken])
 
-        let (data, response) = try await client.getSession().data(for: request)
+        let (data, response) = try await client.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
 
@@ -312,21 +324,53 @@ struct UserService {
         let body = AppleCompleteRequest(apple_id: appleID, username: username, email: email)
         request.httpBody = try JSONEncoder().encode(body)
 
-        let (data, response) = try await client.getSession().data(for: request)
+        let (data, response) = try await client.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
 
         return try JSONDecoder().decode(AuthResponse.self, from: data)
     }
 
-    func getWinRateForGame(userID: Int, boardGameID: Int) async throws -> WinRateResponse {
+    func forgotPassword(email: String) async throws {
+        var components = URLComponents(string: baseURL)
+        components?.path = "/users/forgotPassword"
+        guard let url = components?.url else { throw APIError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["email": email])
+
+        let (_, response) = try await client.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
+    }
+
+    func resetPassword(token: String, newPassword: String) async throws {
+        var components = URLComponents(string: baseURL)
+        components?.path = "/users/resetPassword"
+        guard let url = components?.url else { throw APIError.invalidURL }
+
+        struct Body: Encodable { let token: String; let new_password: String }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(Body(token: token, new_password: newPassword))
+
+        let (_, response) = try await client.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
+    }
+
+    func getWinRateForGame(userID: Int, boardGameID: Int, accessToken: String) async throws -> WinRateResponse {
         var components = URLComponents(string: baseURL)
         components?.path = "/users/winRate/\(userID)/\(boardGameID)"
         guard let url = components?.url else { throw APIError.invalidURL }
 
         var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
 
-        let (data, response) = try await client.getSession().data(for: request)
+        let (data, response) = try await client.data(for: request)
 
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
