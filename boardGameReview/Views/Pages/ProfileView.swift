@@ -91,32 +91,23 @@ struct ProfileView: View {
 
                     // Profile card
                     HStack(alignment: .center, spacing: 24) {
-                        PhotosPicker(
-                            selection: $profileViewModel.selectedItem,
-                            maxSelectionCount: 1,
-                            matching: .images
-                        ) {
-                            if let profileImageURL = profileViewModel.profileImageURL {
-                                AsyncImage(url: URL(string: profileImageURL)) { image in
-                                    image.resizable().scaledToFill()
-                                } placeholder: {
-                                    ProgressView()
+                        if userID == auth.userID {
+                            PhotosPicker(
+                                selection: $profileViewModel.selectedItem,
+                                maxSelectionCount: 1,
+                                matching: .images
+                            ) {
+                                profileAvatar
+                            }
+                            .buttonStyle(.plain)
+                            .tint(.blue)
+                            .onChange(of: profileViewModel.selectedItem) { _, _ in
+                                Task {
+                                    await profileViewModel.handleImageChange(auth: auth)
                                 }
-                                .frame(width: 75, height: 75)
-                                .clipShape(Circle())
-                            } else {
-                                Image(systemName: "person.circle.fill")
-                                    .resizable()
-                                    .frame(width: 75, height: 75)
-                                    .foregroundStyle(Color("MutedText"))
                             }
-                        }
-                        .buttonStyle(.plain)
-                        .tint(.blue)
-                        .onChange(of: profileViewModel.selectedItem) { oldValue, newValue in
-                            Task {
-                                await profileViewModel.handleImageChange(auth: auth)
-                            }
+                        } else {
+                            profileAvatar
                         }
 
                         Spacer()
@@ -137,7 +128,7 @@ struct ProfileView: View {
                                             .background(Color.red)
                                             .clipShape(Capsule())
                                             .offset(x: 10, y: -6)
-                                    } else if profileViewModel.pendingFriends.count > 0 {
+                                    } else if profileViewModel.pendingFriends.count > 0 && userID == auth.userID {
                                         Circle()
                                             .fill(Color.red)
                                             .frame(width: 9, height: 9)
@@ -150,7 +141,7 @@ struct ProfileView: View {
                         ProfileStatBadge(value: String(profileViewModel.boardGames.count), label: "Games")
                     }
                     .padding(20)
-                    .background(Color("CardSurface"))
+                    .background(Color("CardSurface").opacity(0.2))
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .shadow(color: .black.opacity(0.09), radius: 12, x: 0, y: 4)
                     .padding(.horizontal, 16)
@@ -162,12 +153,14 @@ struct ProfileView: View {
                                 .font(.system(size: 18, weight: .bold))
                                 .foregroundStyle(.white)
                             Spacer()
-                            Button {
-                                router.push(.gameNightFeed(userOnly: userID))
-                            } label: {
-                                Text("See All")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(Color("PrimaryButton"))
+                            if userID == auth.userID || profileViewModel.userFriends.contains(where: { $0.id == auth.userID ?? 0 }) {
+                                Button {
+                                    router.push(.gameNightFeed(userOnly: userID))
+                                } label: {
+                                    Text("See All")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(Color("PrimaryButton"))
+                                }
                             }
                         }
                         .padding(.horizontal, 20)
@@ -207,7 +200,7 @@ struct ProfileView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 32)
                             .padding(.horizontal, 16)
-                            .background(Color("CardSurface"))
+                            .background(Color("CardSurface").opacity(0.2))
                             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                             .padding(.horizontal, 16)
                         } else {
@@ -285,6 +278,24 @@ struct ProfileView: View {
     }
 
     @ViewBuilder
+    private var profileAvatar: some View {
+        if let profileImageURL = profileViewModel.profileImageURL {
+            AsyncImage(url: URL(string: profileImageURL)) { image in
+                image.resizable().scaledToFill()
+            } placeholder: {
+                ProgressView()
+            }
+            .frame(width: 75, height: 75)
+            .clipShape(Circle())
+        } else {
+            Image(systemName: "person.circle.fill")
+                .resizable()
+                .frame(width: 75, height: 75)
+                .foregroundStyle(Color("MutedText"))
+        }
+    }
+
+    @ViewBuilder
     private var gameNightImageGrid: some View {
         let nights = Array(profileViewModel.gameNights.filter { profileViewModel.imageURLs[$0.id] != nil }.prefix(4))
         switch nights.count {
@@ -305,10 +316,8 @@ struct ProfileView: View {
                     gameNightImageTile(nights[1])
                 }
                 HStack {
-                    Spacer()
                     gameNightImageTile(nights[2])
-                        .frame(maxWidth: .infinity)
-                    Spacer()
+                        //.frame(maxWidth: .infinity)
                 }
             }
         case 4:
@@ -324,21 +333,24 @@ struct ProfileView: View {
             }
         default:
             if !isLoadingContent {
+                let isNotFriend = userID != auth.userID && !profileViewModel.userFriends.contains(where: { $0.id == auth.userID ?? 0 })
                 VStack(spacing: 10) {
-                    Image(systemName: "dice.fill")
+                    Image(systemName: isNotFriend ? "lock.fill" : "dice.fill")
                         .font(.system(size: 32))
                         .foregroundStyle(Color("MutedText"))
-                    Text("No game nights yet")
+                    Text(isNotFriend ? "Friends only" : "No game nights yet")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.white)
-                    Text("Post your first game night to get started")
+                    Text(isNotFriend
+                         ? "Add \(username ?? "this user") as a friend to see their game nights"
+                         : (userID == auth.userID ? "Post your first game night to get started" : ""))
                         .font(.system(size: 13))
                         .foregroundStyle(Color("MutedText"))
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 32)
-                .background(Color("CardSurface"))
+                .background(Color("CardSurface").opacity(0.2))
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
         }
@@ -368,7 +380,7 @@ struct ProfileView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 150, maxHeight: 150, alignment: .center)
                     .padding()
-                    .background(Color("CardSurface"))
+                    .background(.white.opacity(0.12))
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
             }
@@ -510,7 +522,7 @@ struct FriendsSheet: View {
                     }
                 }
                 .padding(4)
-                .background(Color("CardSurface"))
+                .background(Color("CardSurface").opacity(0.2))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
@@ -520,7 +532,7 @@ struct FriendsSheet: View {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 14))
                             .foregroundStyle(Color("MutedText"))
-                        TextField("Search friends", text: $searchText)
+                        TextField("", text: $searchText, prompt: Text("Search friends").foregroundStyle(Color("MutedText")))
                             .foregroundStyle(.white)
                             .tint(Color("PrimaryButton"))
                             .onChange(of: searchText) {
@@ -529,7 +541,7 @@ struct FriendsSheet: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(Color("CardSurface"))
+                    .background(.white.opacity(0.12))
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
@@ -537,10 +549,19 @@ struct FriendsSheet: View {
                     ScrollView(showsIndicators: false) {
                         LazyVStack(spacing: 12) {
                             ForEach(profileViewModel.filteredFriends) { friend in
-                                TagFriendRow(friend: friend, profileImageURL: profileViewModel.friendProfileImages[friend.id]) {
-                                    router.push(.profile(id: friend.id, username: friend.username))
-                                    isPresented.toggle()
-                                }
+                                TagFriendRow(
+                                    friend: friend,
+                                    profileImageURL: profileViewModel.friendProfileImages[friend.id],
+                                    onTap: {
+                                        router.push(.profile(id: friend.id, username: friend.username))
+                                        isPresented.toggle()
+                                    },
+                                    onRemove: userID == auth.userID ? {
+                                        Task {
+                                            await profileViewModel.removeFriend(userID: auth.userID ?? 0, friendID: friend.id, auth: auth)
+                                        }
+                                    } : nil
+                                )
                             }
                         }
                         .padding(.horizontal, 16)
@@ -569,7 +590,7 @@ struct FriendsSheet: View {
                                     }
                                 )
                                 .padding(14)
-                                .background(Color("CardSurface"))
+                                .background(Color("CardSurface").opacity(0.2))
                                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             }
                         }
@@ -581,7 +602,7 @@ struct FriendsSheet: View {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 14))
                             .foregroundStyle(Color("MutedText"))
-                        TextField("Search by username", text: $findSearchText)
+                        TextField("", text: $findSearchText, prompt: Text("Search by username").foregroundStyle(Color("MutedText")))
                             .foregroundStyle(.white)
                             .tint(Color("PrimaryButton"))
                             .autocapitalization(.none)
@@ -593,7 +614,7 @@ struct FriendsSheet: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(Color("CardSurface"))
+                    .background(.white.opacity(0.12))
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
@@ -646,40 +667,63 @@ private struct TagFriendRow: View {
     let friend: UserPublicModel
     let profileImageURL: String?
     let onTap: () -> Void
+    var onRemove: (() -> Void)? = nil
+    @State private var showRemoveConfirm = false
 
     var body: some View {
-        Button {
-            onTap()
-        } label: {
-            HStack(spacing: 14) {
-                Group {
-                    if let url = profileImageURL {
-                        AsyncImage(url: URL(string: url)) { image in
-                            image.resizable().scaledToFill()
-                        } placeholder: {
-                            ProgressView()
+        HStack(spacing: 14) {
+            Button {
+                onTap()
+            } label: {
+                HStack(spacing: 14) {
+                    Group {
+                        if let url = profileImageURL {
+                            AsyncImage(url: URL(string: url)) { image in
+                                image.resizable().scaledToFill()
+                            } placeholder: {
+                                ProgressView()
+                            }
+                        } else {
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .foregroundStyle(Color("MutedText"))
                         }
-                    } else {
-                        Image(systemName: "person.circle.fill")
-                            .resizable()
+                    }
+                    .frame(width: 46, height: 46)
+                    .clipShape(Circle())
+                    Text(friend.username)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    if onRemove == nil {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Color("MutedText"))
                     }
                 }
-                .frame(width: 46, height: 46)
-                .clipShape(Circle())
-                Text(friend.username)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color("MutedText"))
             }
-            .padding(14)
-            .background(Color("CardSurface"))
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .buttonStyle(.plain)
+
+            if onRemove != nil {
+                Button {
+                    showRemoveConfirm = true
+                } label: {
+                    Image(systemName: "person.badge.minus")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.red.opacity(0.8))
+                }
+                .buttonStyle(.plain)
+                .confirmationDialog("Remove \(friend.username) as a friend?", isPresented: $showRemoveConfirm, titleVisibility: .visible) {
+                    Button("Remove", role: .destructive) {
+                        onRemove?()
+                    }
+                    Button("Cancel", role: .cancel) {}
+                }
+            }
         }
-        .buttonStyle(.plain)
+        .padding(14)
+        .background(Color("CardSurface").opacity(0.2))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
@@ -727,7 +771,7 @@ private struct FindUserRow: View {
             .disabled(requestSent)
         }
         .padding(14)
-        .background(Color("CardSurface"))
+        .background(Color("CardSurface").opacity(0.2))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }

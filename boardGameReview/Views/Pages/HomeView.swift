@@ -1,6 +1,5 @@
 //
 //  HomeView.swift
-//  boardGameReview
 //
 //  Created by Robert Fusting on 12/7/25.
 //
@@ -21,7 +20,7 @@ struct HomeView: View {
             Color("CharcoalBackground").ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 16) {
                     // Header
                     HStack(alignment: .center) {
                         Text("Trending Games")
@@ -40,38 +39,35 @@ struct HomeView: View {
                     .padding(.top, 20)
                     .padding(.bottom, 20)
 
-                    VStack(spacing: 20) {
                         ForEach(homeFeedViewModel.boardGames) { boardGame in
                             Button {
                                 router.push(.boardGame(id: boardGame.id))
                             } label: {
                                 FeedCard(boardGame: boardGame)
                             }
+                            .padding(.horizontal, 12)
                         }
-                        if !isLoading {
-                            Color.clear
-                                .frame(height: 1)
-                                .onAppear {
-                                    Task {
-                                        await homeFeedViewModel.loadMore(accessToken: auth.accessToken ?? "")
-                                    }
+                    if homeFeedViewModel.isLoading {
+                        ProgressView()
+                            .tint(.white)
+                            .padding(.vertical, 16)
+                    }
+
+                    Color.clear
+                        .frame(height: 1)
+                        .onAppear {
+                            if homeFeedViewModel.isLoading == false && homeFeedViewModel.boardGames.count >= 5 {
+                                Task {
+                                    await homeFeedViewModel.fetchMoreBoardGames(accessToken: auth.accessToken ?? "")
                                 }
-                            if homeFeedViewModel.isFetchingMore {
-                                ProgressView().tint(.white).padding(.vertical, 8)
                             }
                         }
                     }
+                .onAppear {
+                    Task {
+                        await homeFeedViewModel.fetchMoreBoardGames(accessToken: auth.accessToken ?? "")
+                    }
                 }
-            }
-            .task {
-                guard homeFeedViewModel.boardGames.isEmpty else { return }
-                await homeFeedViewModel.tempGetBoardGameFeed(accessToken: auth.accessToken ?? "")
-                isLoading = false
-            }
-            .overlay {
-                if isLoading {
-                    Color("CharcoalBackground").ignoresSafeArea()
-                    ProgressView().tint(.white)
                 }
             }
             .fullScreenCover(isPresented: $isSearchPresented) {
@@ -83,10 +79,8 @@ struct HomeView: View {
                         }
                     }
             }
-
         }
     }
-}
 
 // MARK: - Feed Card
 
@@ -159,7 +153,7 @@ private struct FeedCard: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 13)
-            .background(Color("CardSurface"))
+            .background(Color("CardSurface").opacity(0.5))
         }
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.09), radius: 12, x: 0, y: 4)

@@ -206,6 +206,17 @@ class ProfileViewModel: ObservableObject {
     }
 
     @MainActor
+    func removeFriend(userID: Int, friendID: Int, auth: Auth) async {
+        do {
+            try await userService.removeFriend(userID: userID, friendID: friendID, accessToken: auth.accessToken ?? "")
+            userFriends.removeAll { $0.id == friendID }
+            filteredFriends.removeAll { $0.id == friendID }
+        } catch {
+            errorMessage = "Failed to remove friend."
+        }
+    }
+
+    @MainActor
     func searchUsers(query: String, accessToken: String) async {
         guard !query.isEmpty else {
             userSearchResults = []

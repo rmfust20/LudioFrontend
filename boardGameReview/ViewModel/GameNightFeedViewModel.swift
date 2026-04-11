@@ -7,81 +7,51 @@
 
 import Foundation
 
+
 class GameNightFeedViewModel: ObservableObject {
     private let gameNightService: GameNightService
     private let imageService: ImageService
     @Published var gameNightPresent: [GameNightFeedModel] = []
-    @Published private(set) var isFetchingMore = false
+    @Published var isLoading = false
     var gameNights: [GameNightModel] = []
     var gameNightImageURLs: [Int: [String]] = [:]
     var userProfileImages: [Int: String] = [:]
-    var usernames: [Int: String] = [:]
-    private var offset = 0
-    private var hasMore = true
+    @Published var offset = 0
+    
+    //gameNightImageURLs is a dict with key of id that maps to all of its images
+    //userProfileImages is a dict with key of user id that maps to the profile image url
+    
+    //I should probably just have it fetching from an image cache right?? that way we can cook
+    //all we need is a profileImageCache and gameNightImageCahce
+    
+    
 
     init(gameNightService: GameNightService = GameNightService(), imageService: ImageService = ImageService()) {
         self.gameNightService = gameNightService
         self.imageService = imageService
     }
 
+    @MainActor
     func fetchGameNights(userID: Int, accessToken: String) async {
-        gameNightImageURLs = [:]
-        userProfileImages = [:]
-        usernames = [:]
-        offset = 0
-        hasMore = true
-        let nights = try? await gameNightService.getGameNightFeed(userID: userID, offset: 0, accessToken: accessToken)
+        isLoading = true
+        let nights = try? await gameNightService.getGameNightFeed(userID: userID, offset: offset, accessToken: accessToken)
         if let nights {
-            gameNights = nights
-            offset = nights.count
+            let newNights = nights.filter { n in !gameNights.contains(where: { $0.id == n.id }) }
+            gameNights.append(contentsOf: newNights)
+            offset += nights.count
         }
     }
 
+
+    @MainActor
     func fetchUserGameNights(userID: Int, accessToken: String) async {
-        gameNightImageURLs = [:]
-        userProfileImages = [:]
-        usernames = [:]
-        offset = 0
-        hasMore = true
-        let nights = try? await gameNightService.getUserGameNights(userID: userID, offset: 0, accessToken: accessToken)
+        isLoading = true
+        let nights = try? await gameNightService.getUserGameNights(userID: userID, offset: offset, accessToken: accessToken)
         if let nights {
-            gameNights = nights
-            offset = nights.count
+            let newNights = nights.filter { n in !gameNights.contains(where: { $0.id == n.id }) }
+            gameNights.append(contentsOf: newNights)
+            offset += nights.count
         }
-    }
-
-    func loadMore(userID: Int, userOnly: Int?, accessToken: String) async {
-        guard !isFetchingMore, hasMore else { return }
-        await MainActor.run { isFetchingMore = true }
-
-        let newNights: [GameNightModel]?
-        if let userOnly {
-            newNights = try? await gameNightService.getUserGameNights(userID: userOnly, offset: offset, accessToken: accessToken)
-        } else {
-            newNights = try? await gameNightService.getGameNightFeed(userID: userID, offset: offset, accessToken: accessToken)
-        }
-
-        guard let newNights, !newNights.isEmpty else {
-            await MainActor.run { hasMore = false; isFetchingMore = false }
-            return
-        }
-
-        let existingIDs = Set(gameNights.map { $0.id })
-        let dedupedNights = newNights.filter { !existingIDs.contains($0.id) }
-        guard !dedupedNights.isEmpty else {
-            await MainActor.run { hasMore = false; isFetchingMore = false }
-            return
-        }
-        gameNights.append(contentsOf: dedupedNights)
-        offset += newNights.count
-
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.fetchAllGameNightImages(for: newNights, accessToken: accessToken) }
-            group.addTask { await self.fetchUserProfileImages(for: newNights, accessToken: accessToken) }
-        }
-
-        await prepareFinalModel()
-        await MainActor.run { isFetchingMore = false }
     }
 
     func fetchAllGameNightImages(for nights: [GameNightModel], accessToken: String) async {
@@ -91,8 +61,12 @@ class GameNightFeedViewModel: ObservableObject {
         guard !entries.isEmpty else { return }
 
         let urls = (try? await imageService.getImageURLs(blobNames: entries.map { $0.blob }, accessToken: accessToken)) ?? []
+        var grouped: [Int: [String]] = [:]
         for (index, entry) in entries.enumerated() where index < urls.count {
-            gameNightImageURLs[entry.id, default: []].append(urls[index])
+            grouped[entry.id, default: []].append(urls[index])
+        }
+        for (nightID, nightURLs) in grouped {
+            gameNightImageURLs[nightID] = nightURLs
         }
     }
 
@@ -101,9 +75,6 @@ class GameNightFeedViewModel: ObservableObject {
         var seen = Set<Int>(userProfileImages.keys)
         for night in nights {
             for user in night.users {
-                if let username = user.username {
-                    usernames[user.id] = username
-                }
                 if let blob = user.profile_image_url, seen.insert(user.id).inserted {
                     blobEntries.append((user.id, blob))
                 }
@@ -118,8 +89,13 @@ class GameNightFeedViewModel: ObservableObject {
     }
 
     @MainActor
-    func prepareFinalModel() async {
-        gameNightPresent = gameNights.map { night in
+    func prepareFinalModel() {
+        let existingIDs = Set(gameNightPresent.map { $0.id })
+        let newNights = gameNights
+            .filter { !existingIDs.contains($0.id) }
+            .sorted { $0.id > $1.id }
+
+        let newModels = newNights.map { night in
             let winnerIDs = Set(night.sessions.flatMap { $0.winners_user_id }.compactMap { $0 })
 
             let players = night.users.map { user in
@@ -134,7 +110,7 @@ class GameNightFeedViewModel: ObservableObject {
             return GameNightFeedModel(
                 id: night.id,
                 hostUserID: night.host_user_id,
-                hostUsername: usernames[night.host_user_id] ?? "",
+                hostUsername: night.users.first(where: { $0.id == night.host_user_id })?.username ?? "",
                 hostProfileImageURL: userProfileImages[night.host_user_id],
                 date: night.game_night_date,
                 description: night.description,
@@ -143,5 +119,32 @@ class GameNightFeedViewModel: ObservableObject {
                 sessions: night.sessions
             )
         }
+
+        gameNightPresent.append(contentsOf: newModels)
+        isLoading = false
+    }
+    
+ 
+    @MainActor
+    func reset() async {
+        gameNightPresent = []
+        gameNights = []
+        gameNightImageURLs = [:]
+        userProfileImages = [:]
+        offset = 0
+    }
+
+    func fetchMoreGameNights(userID: Int, accessToken: String, userOnly: Int?) async {
+        print("fetching more game nights with offset: \(offset)")
+        if let userOnly = userOnly {
+            await fetchUserGameNights(userID: userOnly, accessToken: accessToken)
+        } else {
+            await fetchGameNights(userID: userID, accessToken: accessToken)
+        }
+        async let images: () = fetchAllGameNightImages(for: gameNights, accessToken: accessToken)
+        async let profiles: () = fetchUserProfileImages(for: gameNights, accessToken: accessToken)
+        await images
+        await profiles
+        await prepareFinalModel()
     }
 }

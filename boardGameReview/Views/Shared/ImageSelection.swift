@@ -17,9 +17,9 @@ struct ImageSelection: View {
             LazyVGrid(columns: columns, spacing: 20) {
                 ForEach(0..<5){ index in
                     if index < imageViewModel.images.count {
-                            ImageTile(onRemove: {
-                                imageViewModel.onRemove(at: index)
-                            }, tileImage: imageViewModel.images[index])
+                        ImageTile(onRemove: {
+                            imageViewModel.onRemove(at: index)
+                        }, tileImage: imageViewModel.images[index])
                     }
                 }
                 PhotosPicker(

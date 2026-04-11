@@ -15,6 +15,7 @@ struct AddReviewView: View {
     @State private var text: String
     @State private var existingReview: ReviewModel?
     @State private var saveError: String?
+    @State private var isUploading = false
     @StateObject private var reviewViewModel = ReviewViewModel()
 
     init(boardGameID: Int, rating: Int, review: ReviewModel?) {
@@ -74,7 +75,25 @@ struct AddReviewView: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, 20)
+
+            if isUploading {
+                Color.black.opacity(0.45).ignoresSafeArea()
+                VStack(spacing: 14) {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(.white)
+                        .scaleEffect(1.3)
+                    Text("Uploading review...")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white)
+                }
+                .padding(24)
+                .background(Color("CardSurface"))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: .black.opacity(0.3), radius: 16, x: 0, y: 6)
+            }
         }
+        .allowsHitTesting(!isUploading)
         .onAppear {
             Task {
                 if let fetched = try? await reviewViewModel.reviewService.getUserReview(
@@ -97,6 +116,8 @@ struct AddReviewView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(existingReview != nil ? "Save" : "Post") {
                     Task {
+                        isUploading = true
+                        defer { isUploading = false }
                         do {
                             if let existing = existingReview, let reviewID = existing.id {
                                 try await reviewViewModel.updateReview(
@@ -115,6 +136,7 @@ struct AddReviewView: View {
                                 )
                                 try await reviewViewModel.postReview(reviewModel, accessToken: auth.accessToken ?? "")
                             }
+                            router.reviewPosted = true
                             router.pop()
                         } catch {
                             saveError = "Failed to save your review. Please try again."
@@ -123,6 +145,7 @@ struct AddReviewView: View {
                 }
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color("PrimaryButton"))
+                .disabled(isUploading)
             }
         }
     }
@@ -130,4 +153,6 @@ struct AddReviewView: View {
 
 #Preview {
     AddReviewView(boardGameID: 0, rating: 0, review: nil)
+        .environmentObject(AppRouter())
+        .environmentObject(Auth())
 }

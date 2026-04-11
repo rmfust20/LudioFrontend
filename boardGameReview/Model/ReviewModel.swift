@@ -22,3 +22,12 @@ struct ReviewModel: Identifiable, Codable, Hashable {
     var comment: String?
     var date_created: String?
 }
+
+struct ReviewPublicModel: Identifiable, Codable {
+    let id: Int
+    let board_game_id: Int
+    let user: UserProfileModel
+    let rating: Int
+    let comment: String?
+    let date_created: String?
+}

@@ -38,9 +38,10 @@ struct ReviewService {
         
     }
     
-    func getReviews(boardGameID: Int, accessToken: String) async throws -> [ReviewModel] {
+    func getReviews(boardGameID: Int, offset: Int = 0, accessToken: String) async throws -> [ReviewPublicModel] {
         var components = URLComponents(string: baseURL)
         components?.path = "/reviews/boardGame/\(boardGameID)"
+        components?.queryItems = [URLQueryItem(name: "offset", value: "\(offset)")]
         guard let url = components?.url else { throw APIError.invalidURL }
         var request = URLRequest(url: url)
         try client.authorizedRequest(&request, accessToken: accessToken)
@@ -50,7 +51,7 @@ struct ReviewService {
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
 
-        let reviews = try JSONDecoder().decode([ReviewModel].self, from: data)
+        let reviews = try JSONDecoder().decode([ReviewPublicModel].self, from: data)
         print(reviews)
         return reviews
 
@@ -91,6 +92,26 @@ struct ReviewService {
         return review
     }
     
+    func getPinnedReview(boardGameID: Int, userID: Int, accessToken: String) async throws -> ReviewPublicModel? {
+        print("triggr")
+        var components = URLComponents(string: baseURL)
+        components?.path = "/reviews//\(userID)/\(boardGameID)"
+        guard let url = components?.url else { throw APIError.invalidURL }
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+
+        let (data, response) = try await client.data(for: request)
+
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
+        print("")
+        let review = try JSONDecoder().decode(ReviewPublicModel.self, from: data)
+        print(review.rating)
+        return review
+    }
+    
+    
+    
     func deleteReview(reviewID: Int, accessToken: String) async throws {
         var components = URLComponents(string: baseURL)
         components?.path = "/reviews/\(reviewID)"
@@ -124,4 +145,21 @@ struct ReviewService {
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
     }
-}
+    
+    func reportReview(reviewID: Int, accessToken: String) async throws {
+        var components = URLComponents(string: baseURL)
+        components?.path = "/reviews/reportReview/\(reviewID)"
+        guard let url = components?.url else { throw APIError.invalidURL }
+
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+
+        request.httpMethod = "POST"
+
+        let (_, response) = try await client.data(for: request)
+
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
+        
+    }
+ }

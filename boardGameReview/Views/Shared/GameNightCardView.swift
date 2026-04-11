@@ -15,7 +15,16 @@ struct GameNightCardView: View {
     @State private var showOptions: Bool = false
     @State private var showDeleteConfirm: Bool = false
     @State private var showDeleteError: Bool = false
+    @State private var showReportConfirm: Bool = false
     private let gameNightService = GameNightService()
+
+    private var nonHostPlayers: [PlayerFeedModel] {
+        gameNight.players.filter { $0.id != gameNight.hostUserID }
+    }
+
+    private var hostIsWinner: Bool {
+        gameNight.players.first { $0.id == gameNight.hostUserID }?.isWinner ?? false
+    }
 
     private var boardGames: [(id: Int, imageURL: String)] {
         var seen = Set<Int>()
@@ -31,25 +40,42 @@ struct GameNightCardView: View {
 
             // Header
             HStack(spacing: 12) {
-                Group {
-                    if let url = gameNight.hostProfileImageURL {
-                        Button {router.push(.profile(id: gameNight.hostUserID, username: gameNight.hostUsername))} label : {
-                            AsyncImage(url: URL(string: url)) { image in
-                                image.resizable().scaledToFill()
-                            } placeholder: {
-                                ProgressView()
+                ZStack(alignment: .bottom) {
+                    Button {
+                        router.push(.profile(id: gameNight.hostUserID, username: gameNight.hostUsername))
+                    } label: {
+                        Group {
+                            if let url = gameNight.hostProfileImageURL {
+                                AsyncImage(url: URL(string: url)) { image in
+                                    image.resizable().scaledToFill()
+                                } placeholder: {
+                                    ProgressView()
+                                }
+                            } else {
+                                Image(systemName: "person.circle.fill")
+                                    .resizable()
+                                    .foregroundStyle(Color("MutedText"))
                             }
                         }
-                    } else {
-                        Button {router.push(.profile(id: gameNight.hostUserID, username: gameNight.hostUsername))} label : {
-                            Image(systemName: "person.circle.fill")
-                                .resizable()
-                                .foregroundStyle(Color("MutedText"))
-                        }
+                        .frame(width: 42, height: 42)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle().stroke(hostIsWinner ? Color.yellow : Color.clear, lineWidth: 2.5)
+                        )
+                    }
+
+                    if hostIsWinner {
+                        Text("Winner")
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Color.yellow)
+                            .clipShape(Capsule())
+                            .offset(y: 8)
                     }
                 }
-                .frame(width: 42, height: 42)
-                .clipShape(Circle())
+                .padding(.bottom, hostIsWinner ? 8 : 0)
                 VStack(alignment: .leading, spacing: 2) {
                     Button {
                         router.push(.profile(id: gameNight.hostUserID, username: gameNight.hostUsername))
@@ -77,9 +103,21 @@ struct GameNightCardView: View {
                             showDeleteConfirm = true
                         }
                     } else {
-                        Button("Report", role: .destructive) { }
+                        Button("Report", role: .destructive) {
+                            showReportConfirm = true
+                        }
                     }
                     Button("Cancel", role: .cancel) { }
+                }
+                .alert("Report this post?", isPresented: $showReportConfirm) {
+                    Button("Report", role: .destructive) {
+                        Task {
+                            try? await gameNightService.reportGameNight(gameNightID: gameNight.id, accessToken: auth.accessToken ?? "")
+                        }
+                    }
+                    Button("Cancel", role: .cancel) { }
+                } message: {
+                    Text("This post will be reported for review.")
                 }
                 .alert("Delete Post?", isPresented: $showDeleteConfirm) {
                     Button("Delete", role: .destructive) {
@@ -127,17 +165,56 @@ struct GameNightCardView: View {
             }
 
             // Players
-            if !gameNight.players.isEmpty {
-                Text("PLAYERS")
+            
+
+            // Board games played
+            if !boardGames.isEmpty {
+                
+                Text("Played")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(Color("MutedText"))
                     .tracking(1.5)
                     .padding(.horizontal, 14)
                     .padding(.top, 12)
+                
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(boardGames, id: \.id) { item in
+                            Button {
+                                router.push(.boardGame(id: item.id))
+                            } label: {
+                                AsyncImage(url: URL(string: item.imageURL)) { image in
+                                    image.resizable().scaledToFill()
+                                } placeholder: {
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.12))
+                                        .overlay(ProgressView())
+                                }
+                                .frame(width: gameNight.photos.isEmpty ? 90 : 56, height: gameNight.photos.isEmpty ? 90 : 56)
+                                .clipped()
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.top, 6)
+                }
+            }
+            
+            if !nonHostPlayers.isEmpty {
+                
+                Text("Players")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Color("MutedText"))
+                    .tracking(1.5)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 12)
+                
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 14) {
-                        ForEach(gameNight.players) { player in
+                        ForEach(nonHostPlayers) { player in
                             Button {
                                 router.push(.profile(id: player.id, username: player.username))
                             } label: {
@@ -182,39 +259,6 @@ struct GameNightCardView: View {
                 }
             }
 
-            // Board games played
-            if !boardGames.isEmpty {
-                Text("PLAYED")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color("MutedText"))
-                    .tracking(1.5)
-                    .padding(.horizontal, 14)
-                    .padding(.top, 12)
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(boardGames, id: \.id) { item in
-                            Button {
-                                router.push(.boardGame(id: item.id))
-                            } label: {
-                                AsyncImage(url: URL(string: item.imageURL)) { image in
-                                    image.resizable().scaledToFill()
-                                } placeholder: {
-                                    Rectangle()
-                                        .fill(Color.gray.opacity(0.12))
-                                        .overlay(ProgressView())
-                                }
-                                .frame(width: gameNight.photos.isEmpty ? 90 : 56, height: gameNight.photos.isEmpty ? 90 : 56)
-                                .clipped()
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 6)
-                }
-            }
-
             // Description
             if let description = gameNight.description, !description.isEmpty {
                 Text(description)
@@ -226,7 +270,7 @@ struct GameNightCardView: View {
             }
         }
         .padding(.bottom,14)
-        .background(Color("CardSurface"))
+        .background(Color("CardSurface").opacity(0.2))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 4)
     }

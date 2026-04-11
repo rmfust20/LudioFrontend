@@ -13,7 +13,7 @@ class BoardGameViewModel: ObservableObject {
     let boardGameID: Int
     @Published var boardGame : BoardGameModel? = nil
     @Published var boardGameImage : UIImage? = nil
-    @Published var reviews: [ReviewModel] = []
+    @Published var reviews: [ReviewPublicModel] = []
     @Published var averageRating: Double? = nil
     @Published var numberOfRatings: Int? = nil
     @Published var numberOfReviews: Int? = nil
@@ -21,6 +21,9 @@ class BoardGameViewModel: ObservableObject {
     @Published var userReview : ReviewModel? = nil
     @Published var userWinRate: WinRateResponse? = nil
     @Published var reviewProfileImages: [Int: String] = [:]
+    @Published var isLoadingReviews = false
+    @Published var reviewsOffset = 0
+    @Published var pinnedReview: ReviewPublicModel? = nil
     private let reviewService: ReviewService
     private let userService: UserService
     private let imageService: ImageService
@@ -84,20 +87,39 @@ class BoardGameViewModel: ObservableObject {
 
     @MainActor
     func getReviews(accessToken: String) async {
-        guard let fetchedReviews = try? await reviewService.getReviews(boardGameID: boardGameID, accessToken: accessToken) else { return }
-        reviews = fetchedReviews
+        isLoadingReviews = true
+        let fetched = (try? await reviewService.getReviews(boardGameID: boardGameID, offset: reviewsOffset, accessToken: accessToken)) ?? []
+        let newReviews = fetched.filter { r in !reviews.contains(where: { $0.id == r.id }) }
+        reviews.append(contentsOf: newReviews)
+        reviewsOffset = reviews.count
 
-        let userIDs = Array(Set(fetchedReviews.map { $0.user_id }))
-        let profiles = (try? await userService.getUsers(userIDs: userIDs, accessToken: accessToken)) ?? []
+        await fetchReviewProfileImages(for: newReviews, accessToken: accessToken)
+        isLoadingReviews = false
+        print(reviews)
+    }
 
-        let blobEntries: [(Int, String)] = profiles.compactMap { p in
-            guard let blob = p.profile_image_url else { return nil }
-            return (p.id, blob)
+    @MainActor
+    func fetchReviewProfileImages(for reviews: [ReviewPublicModel], accessToken: String) async {
+        let knownIDs = Set(reviewProfileImages.keys)
+        var seen = Set<Int>()
+        let blobEntries: [(Int, String)] = reviews.compactMap { r in
+            guard !knownIDs.contains(r.user.id), seen.insert(r.user.id).inserted,
+                  let blob = r.user.profile_image_url else { return nil }
+            return (r.user.id, blob)
         }
+        guard !blobEntries.isEmpty else { return }
+
         let urls = (try? await imageService.getImageURLs(blobNames: blobEntries.map { $0.1 }, accessToken: accessToken)) ?? []
         for (index, (userID, _)) in blobEntries.enumerated() where index < urls.count {
             reviewProfileImages[userID] = urls[index]
         }
+    }
+
+    @MainActor
+    func resetReviews() {
+        reviews = []
+        reviewProfileImages = [:]
+        reviewsOffset = 0
     }
 
     @MainActor
@@ -114,6 +136,14 @@ class BoardGameViewModel: ObservableObject {
         if let review = try? await reviewService.getUserReview(boardGameID: boardGameID, userID: userID, accessToken: accessToken) {
             userRating = review.rating
             userReview = review
+        }
+    }
+    
+    @MainActor
+    func getPinnedReview(userID: Int, accessToken: String) async {
+        if let review = try? await reviewService.getPinnedReview(boardGameID: boardGameID, userID: userID, accessToken: accessToken) {
+            pinnedReview = review
+            await fetchReviewProfileImages(for: [review], accessToken: accessToken)
         }
     }
     

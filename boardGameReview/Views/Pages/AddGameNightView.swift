@@ -36,7 +36,7 @@ struct AddGameNightView: View {
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 16)
-                        .background(Color("CardSurface"))
+                        .background(Color("CardSurface").opacity(0.2))
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .buttonStyle(.plain)
@@ -63,21 +63,22 @@ struct AddGameNightView: View {
                     ZStack(alignment: .topLeading) {
                         TextEditor(text: $gameNightViewModel.description)
                             .scrollContentBackground(.hidden)
-                            .background(Color("CardSurface"))
                             .foregroundStyle(.white)
                             .font(.system(size: 15))
                             .frame(height: 160)
-                            .padding(12)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 8)
                         if gameNightViewModel.description.isEmpty {
                             Text("What happened?")
                                 .font(.system(size: 15))
                                 .foregroundStyle(Color("MutedText"))
-                                .padding(.top, 20)
-                                .padding(.leading, 16)
+                                .padding(.top, 16)
+                                .padding(.leading, 12)
                                 .allowsHitTesting(false)
                         }
                     }
+                    .background(Color("CardSurface").opacity(0.2))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
 
@@ -99,17 +100,19 @@ struct AddGameNightView: View {
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 16)
-                        .background(Color("CardSurface"))
+                        .background(Color("CardSurface").opacity(0.2))
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
+                    .padding(.bottom, 20)
 
                     // Image picker
                     ImageSelection(imageViewModel: imageUploadViewModel)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, 8)
                         .padding(.top, 12)
+                        .opacity(gameNightViewModel.selectedGames.isEmpty ? 0.5 : 1)
 
                     Spacer(minLength: 40)
                 }
@@ -232,7 +235,7 @@ struct AddGameView: View {
                     Spacer()
                 }
                 .padding(14)
-                .background(Color("CardSurface"))
+                .background(Color("CardSurface").opacity(0.2))
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                 AddDurationView(gameNightViewModel: gameNightViewModel, gameID: boardGame.id, isPresented: $durationPresented)
@@ -337,8 +340,13 @@ struct TagFriends: View {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(Color("MutedText"))
                         .padding(.leading, 12)
-                    Button {} label: {
-                        TextField("Tag Friends", text: $searchText)
+                    ZStack(alignment: .leading) {
+                        if searchText.isEmpty {
+                            Text(winnerCaller != nil ? "Tag Winners" : "Tag Friends")
+                                .font(.system(size: 15))
+                                .foregroundStyle(Color("MutedText"))
+                        }
+                        TextField("", text: $searchText)
                             .foregroundStyle(.white)
                             .multilineTextAlignment(.leading)
                             .onChange(of: searchText) {
