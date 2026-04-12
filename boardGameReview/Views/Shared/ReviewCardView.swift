@@ -43,6 +43,7 @@ struct ReviewCardView: View {
                     .foregroundStyle(.white.opacity(0.75))
                     .fixedSize(horizontal: false, vertical: true)
             }
+            Spacer(minLength: 0)
             if reviewModel.user.id != auth.userID {
                 Button {
                     showReportConfirmation = true

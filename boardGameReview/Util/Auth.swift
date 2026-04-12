@@ -19,6 +19,9 @@ final class Auth: ObservableObject {
     @Published private(set) var username: String?
     @Published private(set) var userID: Int?
 
+    /// Stashed invite token from a deep link, consumed after login/signup.
+    @Published var pendingInviteToken: String?
+
     /// The refresh token stored in Keychain from the last session, if any.
     var storedRefreshToken: String? {
         KeychainHelper.load(key: keychainRefreshTokenKey)

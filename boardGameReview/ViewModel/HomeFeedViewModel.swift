@@ -21,24 +21,24 @@ class HomeFeedViewModel : ObservableObject {
     @Published var isLoading = false
     private let boardGameService: BoardGameService
     private var offset = 0
+    private let limit = 25
 
     init(boardGameService: BoardGameService = BoardGameService()) {
         self.boardGameService = boardGameService
     }
-    
+
     @MainActor
     func fetchMoreBoardGames(accessToken: String) async {
         isLoading = true
-        let games = try? await boardGameService.fetchGeneralTrendingFeed(accessToken: accessToken, offset: offset)
-        
+        let games = try? await boardGameService.fetchHotBoardGames(accessToken: accessToken, offset: offset, limit: limit)
+
         if let games {
             let newGames = games.filter { n in !boardGames.contains(where: { $0.id == n.id }) }
             boardGames.append(contentsOf: newGames)
+            offset += games.count
         }
-        
-        offset += boardGames.count
+
         isLoading = false
-        
     }
 }
 

@@ -29,6 +29,26 @@ struct BoardGameService {
         return boardGames
     }
     
+    func fetchHotBoardGames(accessToken: String, offset: Int = 0, limit: Int = 25) async throws -> [BoardGameModel] {
+        var components = URLComponents(string: baseURL)
+        components?.path = "/boardGames/hot"
+        components?.queryItems = [
+            URLQueryItem(name: "offset", value: "\(offset)"),
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
+        guard let url = components?.url else { throw APIError.invalidURL }
+
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+
+        let (data, response) = try await client.data(for: request)
+
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
+
+        return try JSONDecoder().decode([BoardGameModel].self, from: data)
+    }
+
     func fetchBoardGamesByIds(ids: [Int], accessToken: String) async throws -> [BoardGameModel] {
         var components = URLComponents(string: baseURL)
         components?.path = "/boardGames/boardGamesByIds"

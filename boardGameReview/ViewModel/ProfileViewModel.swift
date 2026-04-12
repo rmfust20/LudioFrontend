@@ -26,12 +26,11 @@ class ProfileViewModel: ObservableObject {
     @Published var userFriends: [UserPublicModel] = []
     @Published var filteredFriends: [UserPublicModel] = []
     @Published var pendingFriends: [UserPublicModel] = []
-    @Published var userSearchResults: [UserPublicModel] = []
     @Published var sentFriendRequestIDs: Set<Int> = []
     @Published var winRate: Double? = nil
+    @Published var authUserFriendIDs: Set<Int> = []
     @Published var friendProfileImages: [Int: String] = [:]
     @Published var pendingFriendProfileImages: [Int: String] = [:]
-    @Published var searchResultProfileImages: [Int: String] = [:]
 
     init(boardGameService: BoardGameService = BoardGameService(), gameNightService: GameNightService = GameNightService(), imageService: ImageService = ImageService(), userService: UserService = UserService()) {
         self.boardGameService = boardGameService
@@ -60,15 +59,10 @@ class ProfileViewModel: ObservableObject {
 
     @MainActor
     func fetchImageURLFromBlob(id: Int, blobNames: [String?], accessToken: String) async {
-        var blobFinal: [String] = []
-        for blobName in blobNames {
-            if let blobName = blobName {
-                blobFinal.append(blobName)
-            }
-        }
-        let urls = try? await imageService.getImageURLs(blobNames: blobFinal, accessToken: accessToken)
-        if let firstURL = urls?.first {
-            self.imageURLs[id] = firstURL
+        guard let firstBlob = blobNames.lazy.compactMap({ $0 }).first else { return }
+        let url = try? await imageService.getImageURL(blobName: firstBlob, accessToken: accessToken)
+        if let url {
+            self.imageURLs[id] = url
         }
     }
     
@@ -127,10 +121,20 @@ class ProfileViewModel: ObservableObject {
         if let friends = friends {
             self.userFriends = friends
             self.filteredFriends = friends
-            friendProfileImages = await fetchProfileImages(for: friends.map { $0.id }, accessToken: accessToken)
         }
     }
+
+    @MainActor
+    func fetchFriendProfileImages(accessToken: String) async {
+        friendProfileImages = await fetchProfileImages(for: userFriends.map { $0.id }, accessToken: accessToken)
+    }
     
+    @MainActor
+    func fetchAuthUserFriendIDs(userID: Int, accessToken: String) async {
+        let friends = try? await gameNightService.getUserFriends(userID: userID, accessToken: accessToken)
+        authUserFriendIDs = Set((friends ?? []).map { $0.id })
+    }
+
     @MainActor
     func filterFriends(searchText: String) {
         filteredFriends = userFriends.filter { friend in
@@ -155,10 +159,14 @@ class ProfileViewModel: ObservableObject {
         do {
             let pendingRequests = try await userService.getUserFriendsPending(userID: userID, accessToken: auth.accessToken ?? "")
             pendingFriends = pendingRequests
-            pendingFriendProfileImages = await fetchProfileImages(for: pendingRequests.map { $0.id }, accessToken: auth.accessToken ?? "")
         } catch {
             print("Error fetching pending friend requests: \(error)")
         }
+    }
+
+    @MainActor
+    func fetchPendingFriendProfileImages(accessToken: String) async {
+        pendingFriendProfileImages = await fetchProfileImages(for: pendingFriends.map { $0.id }, accessToken: accessToken)
     }
     
     @MainActor
@@ -214,18 +222,6 @@ class ProfileViewModel: ObservableObject {
         } catch {
             errorMessage = "Failed to remove friend."
         }
-    }
-
-    @MainActor
-    func searchUsers(query: String, accessToken: String) async {
-        guard !query.isEmpty else {
-            userSearchResults = []
-            searchResultProfileImages = [:]
-            return
-        }
-        let results = try? await userService.searchUsers(username: query, accessToken: accessToken)
-        userSearchResults = results ?? []
-        searchResultProfileImages = await fetchProfileImages(for: userSearchResults.map { $0.id }, accessToken: accessToken)
     }
 
     private func fetchProfileImages(for userIDs: [Int], accessToken: String) async -> [Int: String] {

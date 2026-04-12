@@ -265,6 +265,11 @@ struct BoardGameView: View {
                             try? await boardGameViewModel.deleteReview(reviewID: reviewID, accessToken: auth.accessToken ?? "")
                             boardGameViewModel.userReview = nil
                             boardGameViewModel.userRating = 0
+                            boardGameViewModel.resetReviews()
+                            boardGameViewModel.pinnedReview = nil
+                            await boardGameViewModel.getPinnedReview(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "")
+                            await boardGameViewModel.getReviews(accessToken: auth.accessToken ?? "")
+                            await boardGameViewModel.getReviewStats(boardGameID: boardGameID, accessToken: auth.accessToken ?? "")
                         }
                     }
                 }

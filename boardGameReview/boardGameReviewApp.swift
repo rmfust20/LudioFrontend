@@ -36,6 +36,13 @@ struct boardGameReviewApp: App {
                 await restoreSession()
                 isRestoringSession = false
             }
+            .onOpenURL { url in
+                handleDeepLink(url)
+            }
+            .onChange(of: auth.accessToken) { newToken in
+                guard newToken != nil else { return }
+                Task { await processPendingInvite() }
+            }
         }
     }
 
@@ -57,5 +64,31 @@ struct boardGameReviewApp: App {
             user:          RegisterResponse(username: storedUsername, id: storedUserID)
         )
         await MainActor.run { auth.setSession(fullResponse) }
+    }
+
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme?.lowercased() == "tabulus",
+              let host = url.host?.lowercased(),
+              host == "invite",
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let token = components.queryItems?.first(where: { $0.name == "token" })?.value
+        else { return }
+
+        if auth.accessToken != nil {
+            // Already logged in — accept immediately
+            Task { await processPendingInvite(token: token) }
+        } else {
+            // Not logged in — stash for after login/signup
+            auth.pendingInviteToken = token
+        }
+    }
+
+    private func processPendingInvite(token: String? = nil) async {
+        let inviteToken = token ?? auth.pendingInviteToken
+        guard let inviteToken, let accessToken = auth.accessToken else { return }
+
+        await MainActor.run { auth.pendingInviteToken = nil }
+
+        _ = try? await userViewModel.userService.acceptInvite(token: inviteToken, accessToken: accessToken)
     }
 }

@@ -57,3 +57,13 @@ struct AppleCompleteRequest: Codable {
     let username: String
     let email: String?
 }
+
+struct InviteResponse: Codable {
+    let token: String
+    let expires_in_days: Int
+}
+
+struct AcceptInviteResponse: Codable {
+    let message: String
+    let inviter_id: Int
+}
