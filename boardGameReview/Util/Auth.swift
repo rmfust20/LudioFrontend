@@ -12,6 +12,7 @@ private let keychainRefreshTokenKey = "ludio_refresh_token"
 private let defaultsUsernameKey     = "ludio_username"
 private let defaultsUserIDKey       = "ludio_user_id"
 
+@MainActor
 final class Auth: ObservableObject {
     @Published private(set) var accessToken: String?
     @Published private(set) var refreshToken: String?
@@ -29,7 +30,6 @@ final class Auth: ObservableObject {
 
     func setSession(_ auth: AuthResponse) {
         accessToken  = auth.access_token
-        print("Access Token: \(auth.access_token)")
         refreshToken = auth.refresh_token
         tokenType    = auth.token_type
         username     = auth.user.username
@@ -41,7 +41,6 @@ final class Auth: ObservableObject {
     }
 
     func printUsername() {
-        print(username ?? "No username set")
     }
 
     func clear() {

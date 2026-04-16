@@ -52,7 +52,6 @@ struct ReviewService {
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
 
         let reviews = try JSONDecoder().decode([ReviewPublicModel].self, from: data)
-        print(reviews)
         return reviews
 
     }
@@ -75,7 +74,6 @@ struct ReviewService {
     }
     
     func getUserReview(boardGameID: Int, userID: Int, accessToken: String) async throws -> ReviewModel? {
-        print("triggr")
         var components = URLComponents(string: baseURL)
         components?.path = "/reviews/userBoardGame/\(userID)/\(boardGameID)"
         guard let url = components?.url else { throw APIError.invalidURL }
@@ -86,14 +84,11 @@ struct ReviewService {
 
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
-        print("")
         let review = try JSONDecoder().decode(ReviewModel.self, from: data)
-        print(review.rating)
         return review
     }
-    
+
     func getPinnedReview(boardGameID: Int, userID: Int, accessToken: String) async throws -> ReviewPublicModel? {
-        print("triggr")
         var components = URLComponents(string: baseURL)
         components?.path = "/reviews//\(userID)/\(boardGameID)"
         guard let url = components?.url else { throw APIError.invalidURL }
@@ -104,9 +99,7 @@ struct ReviewService {
 
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
-        print("")
         let review = try JSONDecoder().decode(ReviewPublicModel.self, from: data)
-        print(review.rating)
         return review
     }
     

@@ -63,11 +63,6 @@ struct ImageService {
         components?.path = "/images/upload"
         guard let url = components?.url else { throw APIError.invalidURL }
 
-        print("[ImageUpload] uploading \(files.count) file(s) to \(url)")
-        for (i, file) in files.enumerated() {
-            print("[ImageUpload] file \(i + 1): \(file.filename), mime: \(file.mimeType), size: \(file.data.count) bytes")
-        }
-
         var request = URLRequest(url: url)
         try client.authorizedRequest(&request, accessToken: accessToken)
 
@@ -89,22 +84,17 @@ struct ImageService {
         let (respData, response) = try await client.data(for: request)
 
         guard let http = response as? HTTPURLResponse else {
-            print("[ImageUpload] error: no HTTP response")
             throw NSError(domain: "Upload", code: 0, userInfo: [NSLocalizedDescriptionKey: "No HTTP response"])
         }
 
-        print("[ImageUpload] response status: \(http.statusCode)")
-
         guard (200..<300).contains(http.statusCode) else {
             let text = String(data: respData, encoding: .utf8) ?? "<no body>"
-            print("[ImageUpload] error body: \(text)")
             throw NSError(domain: "Upload", code: http.statusCode, userInfo: [
                 NSLocalizedDescriptionKey: "Upload failed (\(http.statusCode)): \(text)"
             ])
         }
 
         let decoded = try JSONDecoder().decode(UploadImagesResponse.self, from: respData)
-        print("[ImageUpload] success — blob names: \(decoded.uploads.compactMap { $0.blob_name })")
         return decoded
     }
     
@@ -156,7 +146,7 @@ struct ImageService {
         return urlString
     }
 
-    func getImageURLs(blobNames: [String], accessToken: String) async throws -> [String] {
+    func getImageURLs(blobNames: [String], accessToken: String) async throws -> [String: String] {
         var components = URLComponents(string: baseURL)
         components?.path = "/images/urls"
         components?.queryItems = blobNames.map { URLQueryItem(name: "blob_names", value: $0) }
@@ -166,8 +156,8 @@ struct ImageService {
         try client.authorizedRequest(&request, accessToken: accessToken)
 
         let (data, _) = try await client.data(for: request)
-        let decoded = try JSONDecoder().decode([String: [String]].self, from: data)
-        return decoded["urls"] ?? []
+        let decoded = try JSONDecoder().decode([String: [String: String]].self, from: data)
+        return decoded["urls"] ?? [:]
     }
 
 }

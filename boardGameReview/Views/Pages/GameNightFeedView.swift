@@ -10,6 +10,7 @@ import SwiftUI
 struct GameNightFeedView: View {
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var auth: Auth
+    @EnvironmentObject private var feedRefresh: FeedRefreshCoordinator
     @StateObject private var gameNightFeedViewModel = GameNightFeedViewModel()
     let userOnly: Int?
     var body: some View {
@@ -22,16 +23,6 @@ struct GameNightFeedView: View {
                             .font(.system(size: 30, weight: .bold))
                             .foregroundStyle(.white)
                         Spacer()
-                        Button {
-                            router.push(.addGameNight(id: 1))
-                        } label: {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 32))
-                            .foregroundStyle(.white)
-                            .padding(.vertical, 16)
-
-                        }
-                        .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
@@ -51,7 +42,9 @@ struct GameNightFeedView: View {
                             .padding(.vertical, 60)
                         }
                         ForEach(gameNightFeedViewModel.gameNightPresent) { gameNight in
-                            GameNightCardView(gameNight: gameNight)
+                            GameNightCardView(gameNight: gameNight, onDelete: {
+                                gameNightFeedViewModel.removeGameNight(id: gameNight.id)
+                            })
                         }
                         
 
@@ -75,6 +68,18 @@ struct GameNightFeedView: View {
                     .padding(.bottom, 32)
                 }
             }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    router.push(.addGameNight(id: 1))
+                } label: {
+                    Image(systemName: "plus")
+                        .foregroundStyle(.white)
+                }
+            }
+        }
+        .toolbarBackground(Color("CharcoalBackground"), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .onAppear {
             Task {
                 await gameNightFeedViewModel.fetchMoreGameNights(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "", userOnly: userOnly)
@@ -85,6 +90,15 @@ struct GameNightFeedView: View {
                 router.gameNightPosted = false
                 Task {
                     await gameNightFeedViewModel.reset()
+                }
+            }
+        }
+        .onChange(of: feedRefresh.friendsChanged) {
+            if feedRefresh.friendsChanged {
+                feedRefresh.friendsChanged = false
+                Task {
+                    await gameNightFeedViewModel.reset()
+                    await gameNightFeedViewModel.fetchMoreGameNights(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "", userOnly: userOnly)
                 }
             }
         }

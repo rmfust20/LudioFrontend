@@ -54,22 +54,26 @@ class GameNightFeedViewModel: ObservableObject {
         }
     }
 
+    @MainActor
     func fetchAllGameNightImages(for nights: [GameNightModel], accessToken: String) async {
         let entries: [(id: Int, blob: String)] = nights.flatMap { night in
             (night.images ?? []).map { (night.id, $0) }
         }
         guard !entries.isEmpty else { return }
 
-        let urls = (try? await imageService.getImageURLs(blobNames: entries.map { $0.blob }, accessToken: accessToken)) ?? []
+        let urlMap = (try? await imageService.getImageURLs(blobNames: entries.map { $0.blob }, accessToken: accessToken)) ?? [:]
         var grouped: [Int: [String]] = [:]
-        for (index, entry) in entries.enumerated() where index < urls.count {
-            grouped[entry.id, default: []].append(urls[index])
+        for entry in entries {
+            if let url = urlMap[entry.blob] {
+                grouped[entry.id, default: []].append(url)
+            }
         }
         for (nightID, nightURLs) in grouped {
             gameNightImageURLs[nightID] = nightURLs
         }
     }
 
+    @MainActor
     func fetchUserProfileImages(for nights: [GameNightModel], accessToken: String) async {
         var blobEntries: [(Int, String)] = []
         var seen = Set<Int>(userProfileImages.keys)
@@ -82,14 +86,16 @@ class GameNightFeedViewModel: ObservableObject {
         }
         guard !blobEntries.isEmpty else { return }
 
-        let urls = (try? await imageService.getImageURLs(blobNames: blobEntries.map { $0.1 }, accessToken: accessToken)) ?? []
-        for (index, (userID, _)) in blobEntries.enumerated() where index < urls.count {
-            userProfileImages[userID] = urls[index]
+        let urlMap = (try? await imageService.getImageURLs(blobNames: blobEntries.map { $0.1 }, accessToken: accessToken)) ?? [:]
+        for (userID, blob) in blobEntries {
+            if let url = urlMap[blob] {
+                userProfileImages[userID] = url
+            }
         }
     }
 
     @MainActor
-    func prepareFinalModel() {
+    func prepareFinalModel() async {
         let existingIDs = Set(gameNightPresent.map { $0.id })
         let newNights = gameNights
             .filter { !existingIDs.contains($0.id) }
@@ -126,6 +132,13 @@ class GameNightFeedViewModel: ObservableObject {
     
  
     @MainActor
+    func removeGameNight(id: Int) {
+        gameNightPresent.removeAll { $0.id == id }
+        gameNights.removeAll { $0.id == id }
+        gameNightImageURLs.removeValue(forKey: id)
+    }
+
+    @MainActor
     func reset() async {
         gameNightPresent = []
         gameNights = []
@@ -134,8 +147,8 @@ class GameNightFeedViewModel: ObservableObject {
         offset = 0
     }
 
+    @MainActor
     func fetchMoreGameNights(userID: Int, accessToken: String, userOnly: Int?) async {
-        print("fetching more game nights with offset: \(offset)")
         if let userOnly = userOnly {
             await fetchUserGameNights(userID: userOnly, accessToken: accessToken)
         } else {

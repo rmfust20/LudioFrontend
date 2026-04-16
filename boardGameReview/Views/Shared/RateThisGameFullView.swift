@@ -36,7 +36,6 @@ struct RateThisGameFullView: View {
                         }
                     }
                 } catch {
-                    print("Error saving review: \(error)")
                 }
             }
         }

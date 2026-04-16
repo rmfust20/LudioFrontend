@@ -16,6 +16,11 @@ struct GameNightCardView: View {
     @State private var showDeleteConfirm: Bool = false
     @State private var showDeleteError: Bool = false
     @State private var showReportConfirm: Bool = false
+    @State private var isDescriptionExpanded = false
+    @State private var isDescriptionTruncated = false
+    @State private var fullDescriptionHeight: CGFloat? = nil
+    @State private var clampedDescriptionHeight: CGFloat? = nil
+    private let descriptionCollapsedLineLimit = 3
     private let gameNightService = GameNightService()
 
     private var nonHostPlayers: [PlayerFeedModel] {
@@ -46,7 +51,7 @@ struct GameNightCardView: View {
                     } label: {
                         Group {
                             if let url = gameNight.hostProfileImageURL {
-                                AsyncImage(url: URL(string: url)) { image in
+                                RetryAsyncImage(url: URL(string: url)) { image in
                                     image.resizable().scaledToFill()
                                 } placeholder: {
                                     ProgressView()
@@ -148,14 +153,14 @@ struct GameNightCardView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(gameNight.photos, id: \.self) { urlString in
-                            AsyncImage(url: URL(string: urlString)) { image in
+                            RetryAsyncImage(url: URL(string: urlString)) { image in
                                 image.resizable().scaledToFill()
                             } placeholder: {
                                 Rectangle()
                                     .fill(Color.gray.opacity(0.12))
                                     .overlay(ProgressView())
                             }
-                            .frame(width: 200, height: 200)
+                            .frame(width: 300, height: 300)
                             .clipped()
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
@@ -165,8 +170,6 @@ struct GameNightCardView: View {
             }
 
             // Players
-            
-
             // Board games played
             if !boardGames.isEmpty {
                 
@@ -184,14 +187,14 @@ struct GameNightCardView: View {
                             Button {
                                 router.push(.boardGame(id: item.id))
                             } label: {
-                                AsyncImage(url: URL(string: item.imageURL)) { image in
+                                RetryAsyncImage(url: URL(string: item.imageURL)) { image in
                                     image.resizable().scaledToFill()
                                 } placeholder: {
                                     Rectangle()
                                         .fill(Color.gray.opacity(0.12))
                                         .overlay(ProgressView())
                                 }
-                                .frame(width: gameNight.photos.isEmpty ? 90 : 56, height: gameNight.photos.isEmpty ? 90 : 56)
+                                .frame(width: gameNight.photos.isEmpty ? 170 : 130, height: gameNight.photos.isEmpty ? 170 : 130)
                                 .clipped()
                                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                             }
@@ -201,9 +204,9 @@ struct GameNightCardView: View {
                     .padding(.top, 6)
                 }
             }
+        
             
             if !nonHostPlayers.isEmpty {
-                
                 Text("Players")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(Color("MutedText"))
@@ -221,7 +224,7 @@ struct GameNightCardView: View {
                                 ZStack(alignment: .bottom) {
                                     Group {
                                         if let url = player.profileImageURL {
-                                            AsyncImage(url: URL(string: url)) { image in
+                                            RetryAsyncImage(url: URL(string: url)) { image in
                                                 image.resizable().scaledToFill()
                                             } placeholder: {
                                                 ProgressView()
@@ -261,18 +264,81 @@ struct GameNightCardView: View {
 
             // Description
             if let description = gameNight.description, !description.isEmpty {
-                Text(description)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .multilineTextAlignment(.leading)
-                    .padding(.horizontal, 14)
-                    .padding(.top, 10)
+                Rectangle()
+                    .fill(Color("MutedText").opacity(0.30))
+                    .frame(height: 1)
+                    .padding(.vertical, 12)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(description)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(isDescriptionExpanded ? nil : descriptionCollapsedLineLimit)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .background(
+                            Text(description)
+                                .font(.system(size: 14))
+                                .fixedSize(horizontal: false, vertical: true)
+                                .hidden()
+                                .background(GeometryReader { full in
+                                    Color.clear.preference(
+                                        key: GameNightDescFullHeightKey.self,
+                                        value: full.size.height
+                                    )
+                                })
+                        )
+                        .background(
+                            Text(description)
+                                .font(.system(size: 14))
+                                .lineLimit(descriptionCollapsedLineLimit)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .hidden()
+                                .background(GeometryReader { clamped in
+                                    Color.clear.preference(
+                                        key: GameNightDescClampedHeightKey.self,
+                                        value: clamped.size.height
+                                    )
+                                })
+                        )
+                        .onPreferenceChange(GameNightDescFullHeightKey.self) { fullHeight in
+                            evaluateDescriptionTruncation(fullHeight: fullHeight, clampedHeight: nil)
+                        }
+                        .onPreferenceChange(GameNightDescClampedHeightKey.self) { clampedHeight in
+                            evaluateDescriptionTruncation(fullHeight: nil, clampedHeight: clampedHeight)
+                        }
+
+                    if isDescriptionTruncated {
+                        Button {
+                            isDescriptionExpanded.toggle()
+                        } label: {
+                            Text(isDescriptionExpanded ? "See less" : "See more")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Color("MutedText"))
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 10)
             }
         }
         .padding(.bottom,14)
         .background(Color("CardSurface").opacity(0.2))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 4)
+    }
+
+    private func evaluateDescriptionTruncation(fullHeight: CGFloat?, clampedHeight: CGFloat?) {
+        if let full = fullHeight {
+            fullDescriptionHeight = full
+        }
+        if let clamped = clampedHeight {
+            clampedDescriptionHeight = clamped
+        }
+        guard let full = fullDescriptionHeight, let clamped = clampedDescriptionHeight else { return }
+        let shouldTruncate = full > clamped + 0.5
+        if shouldTruncate != isDescriptionTruncated {
+            isDescriptionTruncated = shouldTruncate
+        }
     }
 
     private func formattedDate(_ dateString: String) -> String {
@@ -289,6 +355,20 @@ struct GameNightCardView: View {
     }
 }
 
+private struct GameNightDescFullHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct GameNightDescClampedHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 #Preview {
     GameNightCardView(
         gameNight: GameNightFeedModel(
@@ -297,7 +377,7 @@ struct GameNightCardView: View {
             hostUsername: "previewUser",
             hostProfileImageURL: nil as String?,
             date: "2024-05-09T19:00:00Z",
-            description: nil,
+            description: "I wanna be yours - arctic monkeys",
             photos: [],
             players: [
                 PlayerFeedModel(id: 1, username: "alice", profileImageURL: nil, isWinner: true),

@@ -106,7 +106,7 @@ struct AddReviewView: View {
         }
         .alert("Error", isPresented: Binding(
             get: { saveError != nil },
-            set: { if !$0 { saveError = nil } }
+            set: { if !$0 { DispatchQueue.main.async { saveError = nil } } }
         )) {
             Button("OK", role: .cancel) {}
         } message: {

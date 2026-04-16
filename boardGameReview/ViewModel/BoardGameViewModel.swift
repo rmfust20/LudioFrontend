@@ -34,7 +34,6 @@ class BoardGameViewModel: ObservableObject {
         self.userService = userService
         self.imageService = imageService
         self.boardGameID = boardGameID
-        print(boardGameID)
     }
     
     @MainActor
@@ -91,11 +90,10 @@ class BoardGameViewModel: ObservableObject {
         let fetched = (try? await reviewService.getReviews(boardGameID: boardGameID, offset: reviewsOffset, accessToken: accessToken)) ?? []
         let newReviews = fetched.filter { r in !reviews.contains(where: { $0.id == r.id }) }
         reviews.append(contentsOf: newReviews)
-        reviewsOffset = reviews.count
+        reviewsOffset += fetched.count
 
         await fetchReviewProfileImages(for: newReviews, accessToken: accessToken)
         isLoadingReviews = false
-        print(reviews)
     }
 
     @MainActor
@@ -109,9 +107,11 @@ class BoardGameViewModel: ObservableObject {
         }
         guard !blobEntries.isEmpty else { return }
 
-        let urls = (try? await imageService.getImageURLs(blobNames: blobEntries.map { $0.1 }, accessToken: accessToken)) ?? []
-        for (index, (userID, _)) in blobEntries.enumerated() where index < urls.count {
-            reviewProfileImages[userID] = urls[index]
+        let urlMap = (try? await imageService.getImageURLs(blobNames: blobEntries.map { $0.1 }, accessToken: accessToken)) ?? [:]
+        for (userID, blob) in blobEntries {
+            if let url = urlMap[blob] {
+                reviewProfileImages[userID] = url
+            }
         }
     }
 

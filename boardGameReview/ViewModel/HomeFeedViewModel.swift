@@ -29,6 +29,7 @@ class HomeFeedViewModel : ObservableObject {
 
     @MainActor
     func fetchMoreBoardGames(accessToken: String) async {
+        guard !isLoading else { return }
         isLoading = true
         let games = try? await boardGameService.fetchHotBoardGames(accessToken: accessToken, offset: offset, limit: limit)
 

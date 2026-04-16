@@ -59,7 +59,7 @@ struct RegisterView: View {
                                 .font(.system(size: 36))
                                 .foregroundStyle(Color("PrimaryButton"))
                         }
-                        Text("Ludio")
+                        Text("Tabulus")
                             .font(.system(size: 52, weight: .bold))
                             .foregroundStyle(.white)
                         Text("Track games. Share nights.\nBuild memories.")
@@ -734,9 +734,14 @@ struct RegisterView: View {
             }
         } else {
             // Standard email/password registration
-            await userViewModel.register(username: trimmedUsername, email: email, password: password, authStore: auth)
-            if auth.accessToken == nil {
-                errorMessage = "Registration failed. Try a different email or username."
+            let result = await userViewModel.register(username: trimmedUsername, email: email, password: password, authStore: auth)
+            switch result {
+            case .success:
+                break
+            case .duplicate:
+                errorMessage = "That username or email is already in use. Please try another."
+            case .failed:
+                errorMessage = "Registration failed. Please check your connection and try again."
             }
         }
     }

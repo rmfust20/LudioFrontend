@@ -13,19 +13,30 @@ enum AppleSignInResult {
     case failed
 }
 
+enum RegisterResult {
+    case success
+    case duplicate
+    case failed
+}
+
 class UserViewModel: ObservableObject {
     var userService = UserService()
     
-    func register(username: String, email: String, password: String, authStore : Auth) async {
+    func register(username: String, email: String, password: String, authStore: Auth) async -> RegisterResult {
         let user = UserModel(id: nil, username: username, email: email, password: password, profile_image_url: nil)
-        let creds = try? await userService.registerUser(user: user)
-        
-        if creds != nil {
-            var accessResponse = try? await userService.login(username: username, password: password)
-            if let accessResponse = accessResponse {
-                await populateAuth(auth: accessResponse, authStore: authStore )
-            }
+        do {
+            _ = try await userService.registerUser(user: user)
+        } catch APIError.httpStatus(let code) where code == 400 || code == 409 {
+            return .duplicate
+        } catch {
+            return .failed
         }
+
+        guard let accessResponse = try? await userService.login(username: username, password: password) else {
+            return .failed
+        }
+        await populateAuth(auth: accessResponse, authStore: authStore)
+        return .success
     }
     
     func login(username: String, password: String, authStore: Auth) async {

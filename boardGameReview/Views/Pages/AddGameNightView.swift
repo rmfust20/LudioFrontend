@@ -150,7 +150,7 @@ struct AddGameNightView: View {
         }
         .alert("Upload Failed", isPresented: Binding(
             get: { gameNightViewModel.uploadError != nil },
-            set: { if !$0 { gameNightViewModel.uploadError = nil } }
+            set: { if !$0 { DispatchQueue.main.async { gameNightViewModel.uploadError = nil } } }
         )) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -428,7 +428,7 @@ struct TaggedFriendListView: View {
         HStack(spacing: 12) {
             Group {
                 if let url = profileImageURL {
-                    AsyncImage(url: URL(string: url)) { image in
+                    RetryAsyncImage(url: URL(string: url)) { image in
                         image.resizable().scaledToFill()
                     } placeholder: {
                         ProgressView()

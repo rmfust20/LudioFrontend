@@ -75,32 +75,26 @@ class ProfileViewModel: ObservableObject {
         defer { isUploading = false }
 
         do {
-            print("[ProfileImageUpload] starting upload")
             uploaded = try await imageService.uploadSelectedImages(selectedImages: selectedItem, accessToken: auth.accessToken ?? "")
 
             let blobNames = uploaded.compactMap { $0.blob_name }
-            print("[ProfileImageUpload] uploaded blob names: \(blobNames)")
 
             let url = blobNames.first
 
             if let url = url {
-                print("[ProfileImageUpload] updating user profile with blob: \(url)")
-                let updatedUser = UserProfileModel(
+                let updatedUser = UserUpdateModel(
                     id: auth.userID ?? 0,
                     username: nil,
                     email: nil,
                     profile_image_url: url
                 )
                 let blob_name = try await userService.updateUser(updatedUser: updatedUser, accessToken: auth.accessToken ?? "").profile_image_url
-                print("[ProfileImageUpload] updateUser returned blob_name: \(String(describing: blob_name))")
 
                 if let blob_name = blob_name {
                     profileImageURL = try await imageService.getImageURL(blobName: blob_name, accessToken: auth.accessToken ?? "")
-                    print("[ProfileImageUpload] resolved image URL: \(String(describing: profileImageURL))")
                 }
             }
         } catch {
-            print("[ProfileImageUpload] failed: \(error)")
             errorMessage = "Upload failed: \(error.localizedDescription)"
         }
     }
@@ -160,7 +154,6 @@ class ProfileViewModel: ObservableObject {
             let pendingRequests = try await userService.getUserFriendsPending(userID: userID, accessToken: auth.accessToken ?? "")
             pendingFriends = pendingRequests
         } catch {
-            print("Error fetching pending friend requests: \(error)")
         }
     }
 
@@ -180,10 +173,17 @@ class ProfileViewModel: ObservableObject {
     }
 
     @MainActor
-    func acceptFreiendRequest(userID: Int, friendID: Int, auth: Auth) async {
+    func acceptFriendRequest(userID: Int, friendID: Int, auth: Auth) async {
         do {
             try await userService.acceptFriend(userID: userID, friendID: friendID, accessToken: auth.accessToken ?? "")
+            if let accepted = pendingFriends.first(where: { $0.id == friendID }) {
+                if !userFriends.contains(where: { $0.id == friendID }) {
+                    userFriends.append(accepted)
+                    filteredFriends = userFriends
+                }
+            }
             pendingFriends.removeAll { $0.id == friendID }
+            authUserFriendIDs.insert(friendID)
         } catch {
             errorMessage = "Failed to accept friend request."
         }
@@ -199,6 +199,17 @@ class ProfileViewModel: ObservableObject {
     func deleteAccount(auth: Auth) async {
         try? await userService.deleteAccount(accessToken: auth.accessToken ?? "")
         auth.clear()
+    }
+
+    @MainActor
+    func generateInvite(accessToken: String) async -> String? {
+        do {
+            let response = try await userService.generateInvite(accessToken: accessToken)
+            return response.token
+        } catch {
+            errorMessage = "Failed to generate invite."
+            return nil
+        }
     }
 
     @MainActor
@@ -219,11 +230,14 @@ class ProfileViewModel: ObservableObject {
             try await userService.removeFriend(userID: userID, friendID: friendID, accessToken: auth.accessToken ?? "")
             userFriends.removeAll { $0.id == friendID }
             filteredFriends.removeAll { $0.id == friendID }
+            authUserFriendIDs.remove(friendID)
         } catch {
             errorMessage = "Failed to remove friend."
         }
     }
 
+    
+    @MainActor
     private func fetchProfileImages(for userIDs: [Int], accessToken: String) async -> [Int: String] {
         let profiles = (try? await userService.getUsers(userIDs: userIDs, accessToken: accessToken)) ?? []
         let blobEntries: [(Int, String)] = profiles.compactMap { p in
@@ -231,10 +245,12 @@ class ProfileViewModel: ObservableObject {
             return (p.id, blob)
         }
         guard !blobEntries.isEmpty else { return [:] }
-        let urls = (try? await imageService.getImageURLs(blobNames: blobEntries.map { $0.1 }, accessToken: accessToken)) ?? []
+        let urlMap = (try? await imageService.getImageURLs(blobNames: blobEntries.map { $0.1 }, accessToken: accessToken)) ?? [:]
         var result: [Int: String] = [:]
-        for (index, (userID, _)) in blobEntries.enumerated() where index < urls.count {
-            result[userID] = urls[index]
+        for (userID, blob) in blobEntries {
+            if let url = urlMap[blob] {
+                result[userID] = url
+            }
         }
         return result
     }

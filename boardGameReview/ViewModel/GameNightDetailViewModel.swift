@@ -28,11 +28,13 @@ class GameNightDetailViewModel: ObservableObject {
         }
 
         // Resolve profile images and game night photos in parallel
+        let photoBlobs = night.images ?? []
         async let profileFetch = imageService.getImageURLs(blobNames: blobEntries.map { $0.1 }, accessToken: accessToken)
-        async let photoFetch = imageService.getImageURLs(blobNames: night.images ?? [], accessToken: accessToken)
+        async let photoFetch = imageService.getImageURLs(blobNames: photoBlobs, accessToken: accessToken)
 
-        let profileURLs = (try? await profileFetch) ?? []
-        let photoURLs = (try? await photoFetch) ?? []
+        let profileURLMap = (try? await profileFetch) ?? [:]
+        let photoURLMap = (try? await photoFetch) ?? [:]
+        let photoURLs = photoBlobs.compactMap { photoURLMap[$0] }
 
         var userProfileImages: [Int: String] = [:]
         var usernames: [Int: String] = [:]
@@ -42,8 +44,10 @@ class GameNightDetailViewModel: ObservableObject {
                 usernames[user.id] = username
             }
         }
-        for (index, (userID, _)) in blobEntries.enumerated() where index < profileURLs.count {
-            userProfileImages[userID] = profileURLs[index]
+        for (userID, blob) in blobEntries {
+            if let url = profileURLMap[blob] {
+                userProfileImages[userID] = url
+            }
         }
 
         let winnerIDs = Set(night.sessions.flatMap { $0.winners_user_id }.compactMap { $0 })

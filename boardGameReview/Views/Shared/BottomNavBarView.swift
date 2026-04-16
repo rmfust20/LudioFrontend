@@ -13,6 +13,7 @@ enum Tab: Hashable {
 
 struct BottomNavBarView: View {
     @State private var selectedTab: Tab = .home
+    @State private var showBGGRedirect: Bool = false
     @EnvironmentObject private var auth: Auth
 
     init() {
@@ -28,22 +29,48 @@ struct BottomNavBarView: View {
     }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            
-            AppNavRouter(selectedTab: $selectedTab) { GameNightFeedView(userOnly: nil) }
-                .tabItem { Label("Game", systemImage: "envelope.front.fill") }
-                .tag(Tab.game)
-            
-            AppNavRouter(selectedTab: $selectedTab) { HomeView() }
-            .tabItem { Label("Home", systemImage: "house") }
-            .tag(Tab.home)
-            
-            AppNavRouter(selectedTab: $selectedTab) { ProfileView(userID: auth.userID ?? 0, username: auth.username) }
-                    .tabItem { Label("Profile", systemImage: "person") }
-                    .tag(Tab.profile)
-                
+        VStack(spacing: 0) {
+            Button {
+                showBGGRedirect = true
+            } label: {
+                Image("bggIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 100, height: 100)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, -30)
+                    .padding(.bottom, -30)
+            }
+            .background(Color(red: 0.11, green: 0.11, blue: 0.12))
+            .alert("Leave App?", isPresented: $showBGGRedirect) {
+                Button("Go to BoardGameGeek") {
+                    if let url = URL(string: "https://boardgamegeek.com") {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("You will be redirected to boardgamegeek.com")
+            }
+
+            TabView(selection: $selectedTab) {
+
+                AppNavRouter(selectedTab: $selectedTab) { GameNightFeedView(userOnly: nil) }
+                    .tabItem { Label("Game", systemImage: "envelope.front.fill") }
+                    .tag(Tab.game)
+
+                AppNavRouter(selectedTab: $selectedTab) { HomeView() }
+                .tabItem { Label("Home", systemImage: "house") }
+                .tag(Tab.home)
+
+                AppNavRouter(selectedTab: $selectedTab) { ProfileView(userID: auth.userID ?? 0, username: auth.username) }
+                        .tabItem { Label("Profile", systemImage: "person") }
+                        .tag(Tab.profile)
+
+            }
+            .tint(.black)
         }
-        .tint(.black)
     }
 }
 

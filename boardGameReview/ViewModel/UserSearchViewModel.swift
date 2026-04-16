@@ -54,7 +54,6 @@ class UserSearchViewModel {
             } catch is CancellationError {
                 self.isLoading = false
             } catch {
-                print("Error fetching user search results: \(error)")
                 self.searchResults = []
                 self.profileImages = [:]
                 self.isLoading = false
@@ -79,10 +78,12 @@ class UserSearchViewModel {
             return (p.id, blob)
         }
         guard !blobEntries.isEmpty else { return [:] }
-        let urls = (try? await imageService.getImageURLs(blobNames: blobEntries.map { $0.1 }, accessToken: accessToken)) ?? []
+        let urlMap = (try? await imageService.getImageURLs(blobNames: blobEntries.map { $0.1 }, accessToken: accessToken)) ?? [:]
         var result: [Int: String] = [:]
-        for (index, (userID, _)) in blobEntries.enumerated() where index < urls.count {
-            result[userID] = urls[index]
+        for (userID, blob) in blobEntries {
+            if let url = urlMap[blob] {
+                result[userID] = url
+            }
         }
         return result
     }

@@ -63,7 +63,7 @@ struct UserService {
         return try JSONDecoder().decode(AuthResponse.self, from: responseData)
     }
     
-    func updateUser(updatedUser: UserProfileModel, accessToken: String) async throws -> UserProfileModel {
+    func updateUser(updatedUser: UserUpdateModel, accessToken: String) async throws -> UserProfileModel {
         var components = URLComponents(string: baseURL)
         components?.path = "/users/updateUser"
         guard let url = components?.url else { throw APIError.invalidURL }
@@ -235,12 +235,13 @@ struct UserService {
     func logout(refreshToken: String, accessToken:String) async throws {
         var components = URLComponents(string: baseURL)
         components?.path = "/users/logout"
-        components?.queryItems = [URLQueryItem(name: "refresh_token", value: refreshToken)]
         guard let url = components?.url else { throw APIError.invalidURL }
 
         var request = URLRequest(url: url)
         try client.authorizedRequest(&request, accessToken: accessToken)
         request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["refresh_token": refreshToken])
 
         let (_, response) = try await client.data(for: request)
 
@@ -283,11 +284,12 @@ struct UserService {
     func refresh(refreshToken: String) async throws -> RefreshTokenResponse {
         var components = URLComponents(string: baseURL)
         components?.path = "/users/refresh"
-        components?.queryItems = [URLQueryItem(name: "refresh_token", value: refreshToken)]
         guard let url = components?.url else { throw APIError.invalidURL }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["refresh_token": refreshToken])
 
         let (data, response) = try await client.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }

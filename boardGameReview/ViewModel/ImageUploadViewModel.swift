@@ -8,7 +8,7 @@ final class ImageUploadViewModel: ObservableObject {
     @Published var uploaded: [UploadImagesResponse.UploadedFile] = []
     @Published var errorMessage: String?
     @Published var images: [UIImage] = []
-    private var loadedIDs = Set<Int>()  // itemIdentifier strings
+    private var imageCache: [PhotosPickerItem: UIImage] = [:]
     let maxImages = 5
     let imageService: ImageService = ImageService()
     
@@ -34,35 +34,36 @@ final class ImageUploadViewModel: ObservableObject {
     }
     
     func onRemove(at index: Int) {
-        guard index < images.count else { return }
-        let removedID = selectedItems[index].hashValue
-        selectedItems.remove(at: index)
-        images.remove(at: index)
-        loadedIDs.remove(removedID)
+        guard index < selectedItems.count else { return }
+        let removed = selectedItems.remove(at: index)
+        imageCache.removeValue(forKey: removed)
+        rebuildImages()
     }
-    
+
     @MainActor
-    func DetectPhotoChanges(old : [PhotosPickerItem], new: [PhotosPickerItem]) async {
-        // old has what was previously selected, new has what is currently selected
-        let diff = Set(new.map { $0.hashValue}).subtracting(loadedIDs)
-        do {
-            for i in (0..<selectedItems.count) {
-                    if diff.contains(selectedItems[i].hashValue) {
-                        if let data = try await selectedItems[i].loadTransferable(type: Data.self) {
-                            if let uiImage = UIImage(data: data) {
-                                images.append(uiImage)
-                        }
-                    }
-                }
-            }
-            
-            for item in new {
-                let fingerprint = item.hashValue
-                loadedIDs.insert(fingerprint)
-            }
-        } catch {
-            print("Error loading images: \(error)")
+    func DetectPhotoChanges(old: [PhotosPickerItem], new: [PhotosPickerItem]) async {
+        // Drop cached entries for items no longer selected.
+        let newSet = Set(new)
+        for key in imageCache.keys where !newSet.contains(key) {
+            imageCache.removeValue(forKey: key)
         }
+
+        // Load any items we haven't cached yet.
+        for item in new where imageCache[item] == nil {
+            do {
+                if let data = try await item.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data) {
+                    imageCache[item] = uiImage
+                }
+            } catch {
+            }
+        }
+
+        rebuildImages()
+    }
+
+    private func rebuildImages() {
+        images = selectedItems.compactMap { imageCache[$0] }
     }
 }
 

@@ -64,23 +64,18 @@ struct GameNightService {
         guard let url = components?.url else { throw APIError.invalidURL }
         
 
-        print("[getGameNightFeed] GET \(url)")
-
         var request = URLRequest(url: url)
         try client.authorizedRequest(&request, accessToken: accessToken)
 
         let (data, response) = try await client.data(for: request)
 
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
-        print("[getGameNightFeed] status: \(http.statusCode)")
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
 
         do {
             let gameNights = try JSONDecoder().decode([GameNightModel].self, from: data)
-            print("[getGameNightFeed] decoded \(gameNights.count) nights at offset \(offset)")
             return gameNights
         } catch {
-            print("[getGameNightFeed] decode error: \(error)")
             throw error
         }
     }
@@ -125,8 +120,6 @@ struct GameNightService {
         components?.queryItems = [URLQueryItem(name: "offset", value: "\(offset)")]
         guard let url = components?.url else { throw APIError.invalidURL }
 
-        print("[getUserGameNights] GET \(url)")
-
         var request = URLRequest(url: url)
         try client.authorizedRequest(&request, accessToken: accessToken)
         
@@ -134,11 +127,9 @@ struct GameNightService {
         let (data, response) = try await client.data(for: request)
 
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
-        print("[getUserGameNights] status: \(http.statusCode)")
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
 
         let userGameNights = try JSONDecoder().decode([GameNightModel].self, from: data)
-        print("[getUserGameNights] decoded \(userGameNights.count) nights at offset \(offset)")
         return userGameNights
     }
     
@@ -168,12 +159,9 @@ struct GameNightService {
 
         request.httpMethod = "DELETE"
 
-        print("[deleteGameNight] DELETE \(url) | token: \(accessToken.prefix(10))...")
-
         let (_, response) = try await client.data(for: request)
 
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
-        print("[deleteGameNight] status: \(http.statusCode)")
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
     }
     

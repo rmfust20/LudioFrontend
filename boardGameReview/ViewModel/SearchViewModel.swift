@@ -49,7 +49,6 @@ class SearchViewModel {
             } catch is CancellationError {
                 self.isLoading = false
             } catch {
-                print("Error fetching search results: \(error)")
                 self.searchResults = []
                 self.isLoading = false
             }

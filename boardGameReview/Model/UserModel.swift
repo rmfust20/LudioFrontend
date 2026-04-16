@@ -15,6 +15,13 @@ struct UserModel: Identifiable, Codable {
     var profile_image_url: String?
 }
 
+struct UserUpdateModel: Identifiable, Codable {
+    let id: Int
+    let username: String?
+    let email: String?
+    var profile_image_url: String?
+}
+
 struct UserPublicModel: Identifiable, Codable {
     let id: Int
     let username: String
@@ -23,7 +30,6 @@ struct UserPublicModel: Identifiable, Codable {
 struct UserProfileModel: Identifiable, Codable {
     let id: Int
     let username: String?
-    let email: String?
     let profile_image_url: String?
 }
 
