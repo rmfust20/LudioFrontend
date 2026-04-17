@@ -57,7 +57,7 @@ struct GameNightFeedView: View {
                         Color.clear
                             .frame(height: 1)
                             .onAppear {
-                                if gameNightFeedViewModel.isLoading == false && gameNightFeedViewModel.gameNightPresent.count >= 10 {
+                                if gameNightFeedViewModel.isLoading == false && gameNightFeedViewModel.gameNightPresent.count >= 5 {
                                     Task {
                                         await gameNightFeedViewModel.fetchMoreGameNights(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "", userOnly: userOnly)
                                     }
@@ -94,12 +94,9 @@ struct GameNightFeedView: View {
             }
         }
         .onChange(of: feedRefresh.friendsChanged) {
-            if feedRefresh.friendsChanged {
-                feedRefresh.friendsChanged = false
-                Task {
-                    await gameNightFeedViewModel.reset()
-                    await gameNightFeedViewModel.fetchMoreGameNights(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "", userOnly: userOnly)
-                }
+            Task {
+                await gameNightFeedViewModel.reset()
+                await gameNightFeedViewModel.fetchMoreGameNights(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "", userOnly: userOnly)
             }
         }
     }

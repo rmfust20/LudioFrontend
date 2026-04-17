@@ -12,16 +12,19 @@ struct GameNightCardView: View {
     var onDelete: (() -> Void)? = nil
     @EnvironmentObject private var auth: Auth
     @EnvironmentObject private var router: AppRouter
+    @EnvironmentObject private var feedRefresh: FeedRefreshCoordinator
     @State private var showOptions: Bool = false
     @State private var showDeleteConfirm: Bool = false
     @State private var showDeleteError: Bool = false
     @State private var showReportConfirm: Bool = false
+    @State private var showBlockConfirm: Bool = false
     @State private var isDescriptionExpanded = false
     @State private var isDescriptionTruncated = false
     @State private var fullDescriptionHeight: CGFloat? = nil
     @State private var clampedDescriptionHeight: CGFloat? = nil
     private let descriptionCollapsedLineLimit = 3
     private let gameNightService = GameNightService()
+    private let userService = UserService()
 
     private var nonHostPlayers: [PlayerFeedModel] {
         gameNight.players.filter { $0.id != gameNight.hostUserID }
@@ -111,6 +114,9 @@ struct GameNightCardView: View {
                         Button("Report", role: .destructive) {
                             showReportConfirm = true
                         }
+                        Button("Block", role: .destructive) {
+                            showBlockConfirm = true
+                        }
                     }
                     Button("Cancel", role: .cancel) { }
                 }
@@ -123,6 +129,17 @@ struct GameNightCardView: View {
                     Button("Cancel", role: .cancel) { }
                 } message: {
                     Text("This post will be reported for review.")
+                }
+                .alert("Block \(gameNight.hostUsername)?", isPresented: $showBlockConfirm) {
+                    Button("Block", role: .destructive) {
+                        Task {
+                            try? await userService.blockUser(userID: gameNight.hostUserID, accessToken: auth.accessToken ?? "")
+                            feedRefresh.friendsChanged += 1
+                        }
+                    }
+                    Button("Cancel", role: .cancel) { }
+                } message: {
+                    Text("You won't see their reviews or game nights anymore.")
                 }
                 .alert("Delete Post?", isPresented: $showDeleteConfirm) {
                     Button("Delete", role: .destructive) {

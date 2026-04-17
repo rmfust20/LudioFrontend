@@ -52,15 +52,18 @@ struct GameNightService {
         let data = try encoder.encode(gameNight)
         request.httpBody = data
         
-        let (responseData, response) = try await client.data(for: request)
+        let (_, response) = try await client.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
     }
     
-    func getGameNightFeed(userID: Int, offset: Int = 0, accessToken: String) async throws -> [GameNightModel] {
+    func getGameNightFeed(userID: Int, offset: Int = 0, limit: Int = 10, accessToken: String) async throws -> [GameNightModel] {
         var components = URLComponents(string: baseURL)
         components?.path = "/gameNights/userFeed/\(userID)"
-        components?.queryItems = [URLQueryItem(name: "offset", value: "\(offset)")]
+        components?.queryItems = [
+            URLQueryItem(name: "offset", value: "\(offset)"),
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
         guard let url = components?.url else { throw APIError.invalidURL }
         
 
@@ -114,10 +117,13 @@ struct GameNightService {
         return try JSONDecoder().decode(GameNightModel.self, from: data)
     }
 
-    func getUserGameNights(userID: Int, offset: Int = 0, accessToken: String) async throws -> [GameNightModel] {
+    func getUserGameNights(userID: Int, offset: Int = 0, limit: Int = 10, accessToken: String) async throws -> [GameNightModel] {
         var components = URLComponents(string: baseURL)
         components?.path = "/gameNights/userGameNights/\(userID)"
-        components?.queryItems = [URLQueryItem(name: "offset", value: "\(offset)")]
+        components?.queryItems = [
+            URLQueryItem(name: "offset", value: "\(offset)"),
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
         guard let url = components?.url else { throw APIError.invalidURL }
 
         var request = URLRequest(url: url)
@@ -133,6 +139,22 @@ struct GameNightService {
         return userGameNights
     }
     
+    func getRecentGameNightsWithImages(userID: Int, accessToken: String) async throws -> [GameNightModel] {
+        var components = URLComponents(string: baseURL)
+        components?.path = "/gameNights/recentWithImages/\(userID)"
+        guard let url = components?.url else { throw APIError.invalidURL }
+
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+
+        let (data, response) = try await client.data(for: request)
+
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
+
+        return try JSONDecoder().decode([GameNightModel].self, from: data)
+    }
+
     func reportGameNight(gameNightID: Int, accessToken: String) async throws {
         var components = URLComponents(string: baseURL)
         components?.path = "/gameNights/reportGameNight/\(gameNightID)"

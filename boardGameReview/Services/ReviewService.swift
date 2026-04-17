@@ -31,7 +31,7 @@ struct ReviewService {
         let data = try encoder.encode(review)
         request.httpBody = data
         
-        let (responseData, response) = try await client.data(for: request)
+        let (_, response) = try await client.data(for: request)
         
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }

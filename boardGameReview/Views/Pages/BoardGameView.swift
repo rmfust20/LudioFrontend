@@ -12,6 +12,7 @@ struct BoardGameView: View {
     let boardGameID: Int
     @EnvironmentObject var auth: Auth
     @EnvironmentObject var router: AppRouter
+    @EnvironmentObject private var feedRefresh: FeedRefreshCoordinator
     @State var cardImage: UIImage? = nil
     @State var boardGame: BoardGameModel? = nil
     @State var designers: [String] = []
@@ -64,6 +65,15 @@ struct BoardGameView: View {
                     await boardGameViewModel.getReviewStats(boardGameID: boardGameID, accessToken: auth.accessToken ?? "")
                     await boardGameViewModel.getUserReview(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "")
                 }
+            }
+        }
+        .onChange(of: feedRefresh.friendsChanged) {
+            Task {
+                boardGameViewModel.resetReviews()
+                boardGameViewModel.pinnedReview = nil
+                await boardGameViewModel.getPinnedReview(userID: auth.userID ?? 0, accessToken: auth.accessToken ?? "")
+                await boardGameViewModel.getReviews(accessToken: auth.accessToken ?? "")
+                await boardGameViewModel.getReviewStats(boardGameID: boardGameID, accessToken: auth.accessToken ?? "")
             }
         }
     }
@@ -307,6 +317,12 @@ struct BoardGameView: View {
                         try? await reviewViewModel.reportReview(reviewID: reviewID, accessToken: auth.accessToken ?? "")
                     }
                 },
+                onBlock: { userID in
+                    Task {
+                        try? await UserService().blockUser(userID: userID, accessToken: auth.accessToken ?? "")
+                        feedRefresh.friendsChanged += 1
+                    }
+                },
                 onReachEnd: {
                     Task {
                         await boardGameViewModel.getReviews(accessToken: auth.accessToken ?? "")
@@ -345,6 +361,7 @@ private struct ReviewsList: View {
     let isLoading: Bool
     let onTapUser: (Int, String) -> Void
     let onReport: (Int) -> Void
+    let onBlock: (Int) -> Void
     let onReachEnd: () -> Void
 
     private var feedReviews: [ReviewPublicModel] {
@@ -361,7 +378,8 @@ private struct ReviewsList: View {
                     ReviewCardView(
                         reviewModel: pinned,
                         profileImageURL: profileImages[pinned.user.id],
-                        onReport: { onReport(pinned.id) }
+                        onReport: { onReport(pinned.id) },
+                        onBlock: { onBlock(pinned.user.id) }
                     )
                     .padding(.horizontal, 20)
                 }
@@ -379,7 +397,8 @@ private struct ReviewsList: View {
                     ReviewCardView(
                         reviewModel: review,
                         profileImageURL: profileImages[review.user.id],
-                        onReport: { onReport(review.id) }
+                        onReport: { onReport(review.id) },
+                        onBlock: { onBlock(review.user.id) }
                     )
                     .padding(.horizontal, 20)
                 }

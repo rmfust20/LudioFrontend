@@ -399,6 +399,37 @@ struct UserService {
         return try JSONDecoder().decode(AcceptInviteResponse.self, from: data)
     }
 
+    func blockUser(userID: Int, accessToken: String) async throws {
+        var components = URLComponents(string: baseURL)
+        components?.path = "/users/block/\(userID)"
+        guard let url = components?.url else { throw APIError.invalidURL }
+
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+        request.httpMethod = "POST"
+
+        let (_, response) = try await client.data(for: request)
+
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
+    }
+
+    func getGameNightsHostedCount(userID: Int, accessToken: String) async throws -> Int {
+        var components = URLComponents(string: baseURL)
+        components?.path = "/users/gameNightsHosted/\(userID)"
+        guard let url = components?.url else { throw APIError.invalidURL }
+
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+
+        let (data, response) = try await client.data(for: request)
+
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
+
+        return try JSONDecoder().decode(Int.self, from: data)
+    }
+
     func getWinRateForGame(userID: Int, boardGameID: Int, accessToken: String) async throws -> WinRateResponse {
         var components = URLComponents(string: baseURL)
         components?.path = "/users/winRate/\(userID)/\(boardGameID)"

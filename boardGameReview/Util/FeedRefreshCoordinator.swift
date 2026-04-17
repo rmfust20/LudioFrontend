@@ -6,5 +6,5 @@
 import SwiftUI
 
 final class FeedRefreshCoordinator: ObservableObject {
-    @Published var friendsChanged: Bool = false
+    @Published var friendsChanged: Int = 0
 }

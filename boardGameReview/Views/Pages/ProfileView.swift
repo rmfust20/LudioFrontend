@@ -12,6 +12,7 @@ struct ProfileView: View {
     @StateObject var profileViewModel = ProfileViewModel()
     @EnvironmentObject private var router: AppRouter
     @EnvironmentObject private var auth: Auth
+    @EnvironmentObject private var feedRefresh: FeedRefreshCoordinator
     @State private var addFriendsPresented: Bool = false
     @State private var showAccountOptions: Bool = false
     @State private var showLogoutConfirm: Bool = false
@@ -112,7 +113,7 @@ struct ProfileView: View {
 
                         Spacer()
 
-                        ProfileStatBadge(value: String(profileViewModel.gameNights.count), label: "Posts")
+                        ProfileStatBadge(value: String(profileViewModel.gameNightsHostedCount), label: "Posts")
 
                         Button {
                             addFriendsPresented.toggle()
@@ -233,41 +234,10 @@ struct ProfileView: View {
                 }
             }
             .onAppear {
-                Task {
-                    let accessToken = auth.accessToken ?? ""
-                    // Branch 1: fetch game nights, then immediately resolve their images
-                    async let gameNightBranch: Void = {
-                        await profileViewModel.fetchUserGameNights(userID: userID, accessToken: accessToken)
-                        let gameNights = await profileViewModel.gameNights
-                        await withTaskGroup(of: Void.self) { group in
-                            for gameNight in gameNights {
-                                let id = gameNight.id
-                                let blobNames = gameNight.images ?? []
-                                group.addTask {
-                                    await profileViewModel.fetchImageURLFromBlob(id: id, blobNames: blobNames, accessToken: accessToken)
-                                }
-                            }
-                        }
-                    }()
-                    // Branch 2: all other data fetches in parallel
-                    async let friends: () = profileViewModel.getUserFriends(userID: userID, accessToken: accessToken)
-                    async let pendingFriends: () = profileViewModel.getUserFriendsPending(userID: auth.userID ?? 0, auth: auth)
-                    async let boardGames: () = profileViewModel.fetchUserBoardGames(userID: userID, accessToken: accessToken)
-                    async let userProfile: () = profileViewModel.fetchUserProfile(userID: userID, auth: auth)
-                    async let winRate: () = profileViewModel.fetchWinRate(userID: userID, accessToken: accessToken)
-                    await gameNightBranch
-                    await friends
-                    await pendingFriends
-                    await boardGames
-                    await userProfile
-                    await winRate
-                    isLoadingContent = false
-                    // Fetch profile images in background after UI is visible
-                    async let friendImages: () = profileViewModel.fetchFriendProfileImages(accessToken: accessToken)
-                    async let pendingImages: () = profileViewModel.fetchPendingFriendProfileImages(accessToken: accessToken)
-                    await friendImages
-                    await pendingImages
-                }
+                Task { await loadProfile() }
+            }
+            .onChange(of: feedRefresh.friendsChanged) {
+                Task { await loadProfile() }
             }
             .fullScreenCover(isPresented: $addFriendsPresented) {
                 FriendsSheet(profileViewModel: profileViewModel, isPresented: $addFriendsPresented, userID: userID)
@@ -287,6 +257,41 @@ struct ProfileView: View {
                 Text(profileViewModel.errorMessage ?? "")
             }
         }
+    }
+
+    private func loadProfile() async {
+        let accessToken = auth.accessToken ?? ""
+        async let gameNightBranch: Void = {
+            await profileViewModel.fetchRecentGameNightsWithImages(userID: userID, accessToken: accessToken)
+            let gameNights = await profileViewModel.gameNights
+            await withTaskGroup(of: Void.self) { group in
+                for gameNight in gameNights {
+                    let id = gameNight.id
+                    let blobNames = gameNight.images ?? []
+                    group.addTask {
+                        await profileViewModel.fetchImageURLFromBlob(id: id, blobNames: blobNames, accessToken: accessToken)
+                    }
+                }
+            }
+        }()
+        async let friends: () = profileViewModel.getUserFriends(userID: userID, accessToken: accessToken)
+        async let pendingFriends: () = profileViewModel.getUserFriendsPending(userID: auth.userID ?? 0, auth: auth)
+        async let boardGames: () = profileViewModel.fetchUserBoardGames(userID: userID, accessToken: accessToken)
+        async let userProfile: () = profileViewModel.fetchUserProfile(userID: userID, auth: auth)
+        async let winRate: () = profileViewModel.fetchWinRate(userID: userID, accessToken: accessToken)
+        async let hostedCount: () = profileViewModel.fetchGameNightsHostedCount(userID: userID, accessToken: accessToken)
+        await gameNightBranch
+        await friends
+        await pendingFriends
+        await boardGames
+        await userProfile
+        await winRate
+        await hostedCount
+        isLoadingContent = false
+        async let friendImages: () = profileViewModel.fetchFriendProfileImages(accessToken: accessToken)
+        async let pendingImages: () = profileViewModel.fetchPendingFriendProfileImages(accessToken: accessToken)
+        await friendImages
+        await pendingImages
     }
 
     @ViewBuilder
@@ -356,7 +361,7 @@ struct ProfileView: View {
         default:
             if !isLoadingContent {
                 let isNotFriend = userID != auth.userID && !profileViewModel.userFriends.contains(where: { $0.id == auth.userID ?? 0 })
-                let hasGameNightsWithoutImages = !profileViewModel.gameNights.isEmpty
+                let hasGameNightsWithoutImages = profileViewModel.gameNightsHostedCount > 0 && profileViewModel.imageURLs.isEmpty
                 VStack(spacing: 10) {
                     Image(systemName: isNotFriend ? "lock.fill" : (hasGameNightsWithoutImages ? "photo" : "dice.fill"))
                         .font(.system(size: 32))
@@ -589,10 +594,17 @@ struct FriendsSheet: View {
                                     onRemove: isOwnProfile ? {
                                         Task {
                                             await profileViewModel.removeFriend(userID: auth.userID ?? 0, friendID: friend.id, auth: auth)
-                                            feedRefresh.friendsChanged = true
-                                            
+                                            feedRefresh.friendsChanged += 1
+
                                         }
-                                        
+
+                                    } : nil,
+                                    onBlock: isOwnProfile ? {
+                                        Task {
+                                            try? await UserService().blockUser(userID: friend.id, accessToken: auth.accessToken ?? "")
+                                            await profileViewModel.removeFriend(userID: auth.userID ?? 0, friendID: friend.id, auth: auth)
+                                            feedRefresh.friendsChanged += 1
+                                        }
                                     } : nil,
                                     onAdd: canAdd ? {
                                         Task {
@@ -725,9 +737,11 @@ private struct TagFriendRow: View {
     let profileImageURL: String?
     let onTap: () -> Void
     var onRemove: (() -> Void)? = nil
+    var onBlock: (() -> Void)? = nil
     var onAdd: (() -> Void)? = nil
     var requestSent: Bool = false
     @State private var showRemoveConfirm = false
+    @State private var showBlockConfirm = false
 
     var body: some View {
         HStack(spacing: 14) {
@@ -776,7 +790,18 @@ private struct TagFriendRow: View {
                     Button("Remove", role: .destructive) {
                         onRemove?()
                     }
+                    if onBlock != nil {
+                        Button("Block", role: .destructive) {
+                            showBlockConfirm = true
+                        }
+                    }
                     Button("Cancel", role: .cancel) {}
+                }
+                .alert("Block \(friend.username)?", isPresented: $showBlockConfirm) {
+                    Button("Block", role: .destructive) { onBlock?() }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("You won't see their reviews or game nights anymore.")
                 }
             }
 

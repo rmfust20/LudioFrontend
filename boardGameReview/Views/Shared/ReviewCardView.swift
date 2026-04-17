@@ -5,7 +5,10 @@ struct ReviewCardView: View {
     let reviewModel: ReviewPublicModel
     let profileImageURL: String?
     let onReport: () -> Void
+    let onBlock: () -> Void
+    @State private var showOptions = false
     @State private var showReportConfirmation = false
+    @State private var showBlockConfirmation = false
     @State private var isExpanded = false
     @State private var isTruncated = false
     @State private var fullTextHeight: CGFloat? = nil
@@ -94,18 +97,33 @@ struct ReviewCardView: View {
             Spacer(minLength: 0)
             if reviewModel.user.id != auth.userID {
                 Button {
-                    showReportConfirmation = true
+                    showOptions = true
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 16))
                         .foregroundStyle(Color("MutedText"))
                         .padding(8)
                 }
-                .confirmationDialog("Report this review?", isPresented: $showReportConfirmation, titleVisibility: .visible) {
+                .confirmationDialog("", isPresented: $showOptions) {
                     Button("Report", role: .destructive) {
-                        onReport()
+                        showReportConfirmation = true
+                    }
+                    Button("Block", role: .destructive) {
+                        showBlockConfirmation = true
                     }
                     Button("Cancel", role: .cancel) {}
+                }
+                .alert("Report this review?", isPresented: $showReportConfirmation) {
+                    Button("Report", role: .destructive) { onReport() }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("This review will be reported for review.")
+                }
+                .alert("Block \(reviewModel.user.username ?? "this user")?", isPresented: $showBlockConfirmation) {
+                    Button("Block", role: .destructive) { onBlock() }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("You won't see their reviews or game nights anymore.")
                 }
             }
         }

@@ -31,6 +31,7 @@ class ProfileViewModel: ObservableObject {
     @Published var authUserFriendIDs: Set<Int> = []
     @Published var friendProfileImages: [Int: String] = [:]
     @Published var pendingFriendProfileImages: [Int: String] = [:]
+    @Published var gameNightsHostedCount: Int = 0
 
     init(boardGameService: BoardGameService = BoardGameService(), gameNightService: GameNightService = GameNightService(), imageService: ImageService = ImageService(), userService: UserService = UserService()) {
         self.boardGameService = boardGameService
@@ -49,8 +50,8 @@ class ProfileViewModel: ObservableObject {
     }
 
     @MainActor
-    func fetchUserGameNights(userID: Int, accessToken: String) async {
-        let nights = try? await gameNightService.getUserGameNights(userID: userID, accessToken: accessToken)
+    func fetchRecentGameNightsWithImages(userID: Int, accessToken: String) async {
+        let nights = try? await gameNightService.getRecentGameNightsWithImages(userID: userID, accessToken: accessToken)
 
         if let nights {
             self.gameNights = nights
@@ -222,6 +223,13 @@ class ProfileViewModel: ObservableObject {
     func fetchWinRate(userID: Int, accessToken: String) async {
         let result = try? await userService.getWinRate(userID: userID, accessToken: accessToken)
         winRate = result?.win_rate
+    }
+
+    @MainActor
+    func fetchGameNightsHostedCount(userID: Int, accessToken: String) async {
+        if let count = try? await userService.getGameNightsHostedCount(userID: userID, accessToken: accessToken) {
+            gameNightsHostedCount = count
+        }
     }
 
     @MainActor

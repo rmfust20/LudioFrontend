@@ -56,7 +56,7 @@ struct HomeView: View {
                     Color.clear
                         .frame(height: 1)
                         .onAppear {
-                            if homeFeedViewModel.isLoading == false && homeFeedViewModel.boardGames.count >= 5 {
+                            if homeFeedViewModel.isLoading == false && homeFeedViewModel.boardGames.count >= 10 {
                                 Task {
                                     await homeFeedViewModel.fetchMoreBoardGames(accessToken: auth.accessToken ?? "")
                                 }
