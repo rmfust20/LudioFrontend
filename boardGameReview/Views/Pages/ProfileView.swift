@@ -591,26 +591,24 @@ struct FriendsSheet: View {
                                         router.push(.profile(id: friend.id, username: friend.username))
                                         isPresented.toggle()
                                     },
-                                    onRemove: isOwnProfile ? {
+                                    onRemove: isOwnProfile ? ({
                                         Task {
                                             await profileViewModel.removeFriend(userID: auth.userID ?? 0, friendID: friend.id, auth: auth)
                                             feedRefresh.friendsChanged += 1
-
                                         }
-
-                                    } : nil,
-                                    onBlock: isOwnProfile ? {
+                                    } as (() -> Void)?) : nil,
+                                    onBlock: isOwnProfile ? ({
                                         Task {
                                             try? await UserService().blockUser(userID: friend.id, accessToken: auth.accessToken ?? "")
                                             await profileViewModel.removeFriend(userID: auth.userID ?? 0, friendID: friend.id, auth: auth)
                                             feedRefresh.friendsChanged += 1
                                         }
-                                    } : nil,
-                                    onAdd: canAdd ? {
+                                    } as (() -> Void)?) : nil,
+                                    onAdd: canAdd ? ({
                                         Task {
                                             await profileViewModel.sendFriendRequest(userID: auth.userID ?? 0, friendID: friend.id, auth: auth)
                                         }
-                                    } : nil,
+                                    } as (() -> Void)?) : nil,
                                     requestSent: profileViewModel.sentFriendRequestIDs.contains(friend.id)
                                 )
                             }
