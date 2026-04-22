@@ -3,14 +3,22 @@
   <img src="TabGif.gif" alt="Landing Screen" width="25%"/>
 </div>
 
+<hr>
+
 <div align="center">
 <img src="Explore.png" alt="Find new board games" width="25%"/>
+
+<hr>
 
 <div align="center">
 <img src="Review.png" alt="Review" width=25%"/>
 
+<hr>
+
 <div align="center">
 <img src="Share.png" alt="Share" width=25%"/>
+
+
 
 
 
