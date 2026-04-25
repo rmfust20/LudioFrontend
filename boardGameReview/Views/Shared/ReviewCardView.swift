@@ -5,6 +5,7 @@ struct ReviewCardView: View {
     let reviewModel: ReviewPublicModel
     let profileImageURL: String?
     let onEllipsisTap: () -> Void
+    let onLikeToggle: () -> Void
     @State private var isExpanded = false
     @State private var isTruncated = false
     @State private var fullTextHeight: CGFloat? = nil
@@ -30,63 +31,65 @@ struct ReviewCardView: View {
             .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 5) {
+                Text(reviewModel.user.username ?? "Unknown User")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
                 HStack(spacing: 8) {
-                    Text(reviewModel.user.username ?? "Unknown User")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-
+                    
                     Text("rated it")
                         .font(.system(size: 13))
                         .foregroundStyle(Color("MutedText"))
-
+                    
                     FlexStarsView(rating: .constant(reviewModel.rating), size: 12, interactive: false)
                 }
-
-                let comment = reviewModel.comment ?? ""
-                Text(comment)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.75))
-                    .lineLimit(isExpanded ? nil : collapsedLineLimit)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .background(
-                        Text(comment)
-                            .font(.system(size: 14))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .hidden()
-                            .background(GeometryReader { full in
-                                Color.clear.preference(
-                                    key: ReviewTextHeightKey.self,
-                                    value: full.size.height
-                                )
-                            })
-                    )
-                    .background(
-                        Text(comment)
-                            .font(.system(size: 14))
-                            .lineLimit(collapsedLineLimit)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .hidden()
-                            .background(GeometryReader { clamped in
-                                Color.clear.preference(
-                                    key: ReviewClampedHeightKey.self,
-                                    value: clamped.size.height
-                                )
-                            })
-                    )
-                    .onPreferenceChange(ReviewTextHeightKey.self) { fullHeight in
-                        evaluateTruncation(fullHeight: fullHeight, clampedHeight: nil)
-                    }
-                    .onPreferenceChange(ReviewClampedHeightKey.self) { clampedHeight in
-                        evaluateTruncation(fullHeight: nil, clampedHeight: clampedHeight)
-                    }
-
-                if isTruncated {
-                    Button {
-                        isExpanded.toggle()
-                    } label: {
-                        Text(isExpanded ? "See less" : "See more")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color("MutedText"))
+                
+                if let comment = reviewModel.comment {
+                    Text(comment)
+                        .font(.system(size: 14))
+                        .padding(.top,15)
+                        .foregroundStyle(.white.opacity(0.75))
+                        .lineLimit(isExpanded ? nil : collapsedLineLimit)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .background(
+                            Text(comment)
+                                .font(.system(size: 14))
+                                .fixedSize(horizontal: false, vertical: true)
+                                .hidden()
+                                .background(GeometryReader { full in
+                                    Color.clear.preference(
+                                        key: ReviewTextHeightKey.self,
+                                        value: full.size.height
+                                    )
+                                })
+                        )
+                        .background(
+                            Text(comment)
+                                .font(.system(size: 14))
+                                .lineLimit(collapsedLineLimit)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .hidden()
+                                .background(GeometryReader { clamped in
+                                    Color.clear.preference(
+                                        key: ReviewClampedHeightKey.self,
+                                        value: clamped.size.height
+                                    )
+                                })
+                        )
+                        .onPreferenceChange(ReviewTextHeightKey.self) { fullHeight in
+                            evaluateTruncation(fullHeight: fullHeight, clampedHeight: nil)
+                        }
+                        .onPreferenceChange(ReviewClampedHeightKey.self) { clampedHeight in
+                            evaluateTruncation(fullHeight: nil, clampedHeight: clampedHeight)
+                        }
+                    
+                    if isTruncated {
+                        Button {
+                            isExpanded.toggle()
+                        } label: {
+                            Text(isExpanded ? "See less" : "See more")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Color("MutedText"))
+                        }
                     }
                 }
             }
@@ -105,6 +108,19 @@ struct ReviewCardView: View {
             }
         }
         .padding(.vertical, 14)
+        HStack {
+            Text("\(reviewModel.likes_count)")
+                .foregroundStyle(Color("MutedText"))
+
+            Button {
+                onLikeToggle()
+            } label: {
+                Image(systemName: reviewModel.user_has_liked ? "hand.thumbsup.fill" : "hand.thumbsup")
+                    .foregroundStyle(Color("MutedText"))
+            }
+            
+            Spacer()
+        }
     }
 
     private func evaluateTruncation(fullHeight: CGFloat?, clampedHeight: CGFloat?) {
@@ -252,4 +268,37 @@ private struct ReviewClampedHeightKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
     }
+}
+
+#Preview {
+    let shortReview = ReviewPublicModel(
+        id: 1,
+        board_game_id: 100,
+        user: UserProfileModel(id: 2, username: "BoardGameFan", profile_image_url: nil),
+        rating: 4,
+        comment: "Solid mechanics, fun theme.",
+        date_created: nil,
+        likes_count: 0,
+        user_has_liked: false
+    )
+
+    let longReview = ReviewPublicModel(
+        id: 2,
+        board_game_id: 100,
+        user: UserProfileModel(id: 3, username: "MeepleMaven", profile_image_url: nil),
+        rating: 5,
+        comment: "Absolutely loved this one. The mechanics are tight, the theme is dripping off every component, and every game has felt different so far. Easily one of the best additions to my shelf this year — would recommend to anyone who likes medium-weight strategy games.",
+        date_created: nil,
+        likes_count: 0,
+        user_has_liked: true
+    )
+
+    return VStack(alignment: .leading, spacing: 0) {
+        ReviewCardView(reviewModel: shortReview, profileImageURL: nil, onEllipsisTap: {}, onLikeToggle: {})
+        Divider().background(Color.white.opacity(0.1))
+        ReviewCardView(reviewModel: longReview, profileImageURL: nil, onEllipsisTap: {}, onLikeToggle: {})
+    }
+    .padding(.horizontal)
+    .background(Color.black)
+    .environmentObject(Auth())
 }

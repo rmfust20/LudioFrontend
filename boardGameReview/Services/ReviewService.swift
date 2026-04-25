@@ -40,7 +40,7 @@ struct ReviewService {
     
     func getReviews(boardGameID: Int, offset: Int = 0, accessToken: String) async throws -> [ReviewPublicModel] {
         var components = URLComponents(string: baseURL)
-        components?.path = "/reviews/boardGame/\(boardGameID)"
+        components?.path = "/reviews/boardGame/test/\(boardGameID)"
         components?.queryItems = [URLQueryItem(name: "offset", value: "\(offset)")]
         guard let url = components?.url else { throw APIError.invalidURL }
         var request = URLRequest(url: url)
@@ -155,4 +155,39 @@ struct ReviewService {
         guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
         
     }
+    
+    func likeReview(reviewID: Int, accessToken: String) async throws {
+        var components = URLComponents(string: baseURL)
+        components?.path = "/reviews/like/\(reviewID)"
+        guard let url = components?.url else { throw APIError.invalidURL }
+        
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+        
+        request.httpMethod = "POST"
+        
+        let (_, response) = try await client.data(for: request)
+        
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
+        
+    }
+    
+    func unlikeReview(reviewID: Int, accessToken: String) async throws {
+        var components = URLComponents(string: baseURL)
+        components?.path = "/reviews/unlike/\(reviewID)"
+        guard let url = components?.url else { throw APIError.invalidURL }
+        
+        var request = URLRequest(url: url)
+        try client.authorizedRequest(&request, accessToken: accessToken)
+        
+        request.httpMethod = "DELETE"
+        
+        let (_, response) = try await client.data(for: request)
+        
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else { throw APIError.httpStatus(http.statusCode) }
+        
+    }
+
  }

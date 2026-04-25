@@ -30,4 +30,6 @@ struct ReviewPublicModel: Identifiable, Codable {
     let rating: Int
     let comment: String?
     let date_created: String?
+    let likes_count: Int
+    let user_has_liked: Bool
 }

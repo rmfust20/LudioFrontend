@@ -76,6 +76,7 @@ struct HomeView: View {
                         if let id = selectedBoardGameID {
                             isSearchPresented = false
                             router.push(.boardGame(id: id))
+                            selectedBoardGameID = nil
                         }
                     }
             }

@@ -328,6 +328,11 @@ struct BoardGameView: View {
                 onEllipsisTap: { review in
                     reviewOptionsTarget = review
                 },
+                onLikeToggle: { reviewID in
+                    Task {
+                        await boardGameViewModel.toggleLike(reviewID: reviewID, accessToken: auth.accessToken ?? "")
+                    }
+                },
                 onReachEnd: {
                     Task {
                         await boardGameViewModel.getReviews(accessToken: auth.accessToken ?? "")
@@ -366,6 +371,7 @@ private struct ReviewsList: View {
     let isLoading: Bool
     let onTapUser: (Int, String) -> Void
     let onEllipsisTap: (ReviewPublicModel) -> Void
+    let onLikeToggle: (Int) -> Void
     let onReachEnd: () -> Void
 
     private var feedReviews: [ReviewPublicModel] {
@@ -379,7 +385,8 @@ private struct ReviewsList: View {
                 ReviewCardView(
                     reviewModel: pinned,
                     profileImageURL: profileImages[pinned.user.id],
-                    onEllipsisTap: { onEllipsisTap(pinned) }
+                    onEllipsisTap: { onEllipsisTap(pinned) },
+                    onLikeToggle: { onLikeToggle(pinned.id) }
                 )
                 .padding(.horizontal, 20)
                 .contentShape(Rectangle())
@@ -396,7 +403,8 @@ private struct ReviewsList: View {
                 ReviewCardView(
                     reviewModel: review,
                     profileImageURL: profileImages[review.user.id],
-                    onEllipsisTap: { onEllipsisTap(review) }
+                    onEllipsisTap: { onEllipsisTap(review) },
+                    onLikeToggle: { onLikeToggle(review.id) }
                 )
                 .padding(.horizontal, 20)
                 .contentShape(Rectangle())

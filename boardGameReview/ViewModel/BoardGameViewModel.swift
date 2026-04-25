@@ -150,6 +150,50 @@ class BoardGameViewModel: ObservableObject {
     func updateReview(reviewID: Int, review: ReviewUpdate, accessToken: String) async throws {
         try await reviewService.updateReview(reviewID: reviewID, update: review, accessToken: accessToken)
     }
+
+    @MainActor
+    func toggleLike(reviewID: Int, accessToken: String) async {
+        let originalReviews = reviews
+        let originalPinned = pinnedReview
+
+        func toggled(_ r: ReviewPublicModel) -> ReviewPublicModel {
+            let nowLiked = !r.user_has_liked
+            return ReviewPublicModel(
+                id: r.id,
+                board_game_id: r.board_game_id,
+                user: r.user,
+                rating: r.rating,
+                comment: r.comment,
+                date_created: r.date_created,
+                likes_count: r.likes_count + (nowLiked ? 1 : -1),
+                user_has_liked: nowLiked
+            )
+        }
+
+        var wasLiked: Bool? = nil
+        if let idx = reviews.firstIndex(where: { $0.id == reviewID }) {
+            wasLiked = reviews[idx].user_has_liked
+            reviews[idx] = toggled(reviews[idx])
+        }
+        if let pinned = pinnedReview, pinned.id == reviewID {
+            if wasLiked == nil { wasLiked = pinned.user_has_liked }
+            pinnedReview = toggled(pinned)
+        }
+
+        guard let wasLiked else { return }
+
+        do {
+            if wasLiked {
+                try await reviewService.unlikeReview(reviewID: reviewID, accessToken: accessToken)
+            } else {
+                try await reviewService.likeReview(reviewID: reviewID, accessToken: accessToken)
+            }
+        } catch {
+            print("toggleLike failed:", error)
+            reviews = originalReviews
+            pinnedReview = originalPinned
+        }
+    }
     
     func deleteReview(reviewID: Int, accessToken: String) async throws {
         try await reviewService.deleteReview(reviewID: reviewID, accessToken: accessToken)

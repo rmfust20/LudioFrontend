@@ -120,12 +120,14 @@ struct AddGameNightView: View {
             .fullScreenCover(isPresented: $isPresented) {
                 SearchView(isPresented: $isPresented, selectedBoardGameID: $selectedBoardGameID)
                     .onChange(of: selectedBoardGameID) {
+                        guard let id = selectedBoardGameID else { return }
                         Task {
-                            let game = await gameNightViewModel.fetchBoardGame(selectedBoardGameID ?? -1, accessToken: auth.accessToken ?? "")
+                            let game = await gameNightViewModel.fetchBoardGame(id, accessToken: auth.accessToken ?? "")
                             if let game {
                                 gameNightViewModel.selectedGames.append(game)
                             }
-                            isPresented.toggle()
+                            isPresented = false
+                            selectedBoardGameID = nil
                         }
                     }
             }
